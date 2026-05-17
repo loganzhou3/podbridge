@@ -14,7 +14,166 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      episodes: {
+        Row: {
+          audio_url: string | null
+          created_at: string
+          description: string | null
+          duration_seconds: number | null
+          guid: string | null
+          id: string
+          podcast_id: string
+          pub_date: string | null
+          title: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          guid?: string | null
+          id?: string
+          podcast_id: string
+          pub_date?: string | null
+          title?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string
+          description?: string | null
+          duration_seconds?: number | null
+          guid?: string | null
+          id?: string
+          podcast_id?: string
+          pub_date?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "episodes_podcast_id_fkey"
+            columns: ["podcast_id"]
+            isOneToOne: false
+            referencedRelation: "podcasts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      podcasts: {
+        Row: {
+          activity_score: number | null
+          audience_tags: string[] | null
+          author: string | null
+          avg_duration_minutes: number | null
+          category: string | null
+          commercial_score: number | null
+          created_at: string
+          description: string | null
+          episode_count: number | null
+          first_episode_at: string | null
+          growth_score: number | null
+          id: string
+          image_url: string | null
+          itunes_id: string | null
+          itunes_url: string | null
+          language: string | null
+          last_synced_at: string | null
+          latest_episode_at: string | null
+          lifecycle_stage: string | null
+          rss_url: string
+          title: string | null
+          update_frequency_days: number | null
+          updated_at: string
+        }
+        Insert: {
+          activity_score?: number | null
+          audience_tags?: string[] | null
+          author?: string | null
+          avg_duration_minutes?: number | null
+          category?: string | null
+          commercial_score?: number | null
+          created_at?: string
+          description?: string | null
+          episode_count?: number | null
+          first_episode_at?: string | null
+          growth_score?: number | null
+          id?: string
+          image_url?: string | null
+          itunes_id?: string | null
+          itunes_url?: string | null
+          language?: string | null
+          last_synced_at?: string | null
+          latest_episode_at?: string | null
+          lifecycle_stage?: string | null
+          rss_url: string
+          title?: string | null
+          update_frequency_days?: number | null
+          updated_at?: string
+        }
+        Update: {
+          activity_score?: number | null
+          audience_tags?: string[] | null
+          author?: string | null
+          avg_duration_minutes?: number | null
+          category?: string | null
+          commercial_score?: number | null
+          created_at?: string
+          description?: string | null
+          episode_count?: number | null
+          first_episode_at?: string | null
+          growth_score?: number | null
+          id?: string
+          image_url?: string | null
+          itunes_id?: string | null
+          itunes_url?: string | null
+          language?: string | null
+          last_synced_at?: string | null
+          latest_episode_at?: string | null
+          lifecycle_stage?: string | null
+          rss_url?: string
+          title?: string | null
+          update_frequency_days?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      snapshots: {
+        Row: {
+          apple_rank: number | null
+          episode_count: number | null
+          estimated_reviews: number | null
+          estimated_subscribers: number | null
+          id: string
+          podcast_id: string
+          taken_at: string
+        }
+        Insert: {
+          apple_rank?: number | null
+          episode_count?: number | null
+          estimated_reviews?: number | null
+          estimated_subscribers?: number | null
+          id?: string
+          podcast_id: string
+          taken_at?: string
+        }
+        Update: {
+          apple_rank?: number | null
+          episode_count?: number | null
+          estimated_reviews?: number | null
+          estimated_subscribers?: number | null
+          id?: string
+          podcast_id?: string
+          taken_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "snapshots_podcast_id_fkey"
+            columns: ["podcast_id"]
+            isOneToOne: false
+            referencedRelation: "podcasts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
