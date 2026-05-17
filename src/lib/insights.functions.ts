@@ -364,7 +364,7 @@ export const findBrandContact = createServerFn({ method: "POST" })
           website,
           contact_email: email,
           notes,
-          raw: { emails } as unknown as object,
+          raw: { emails } as unknown as never,
           fetched_at: new Date().toISOString(),
         });
       } catch (e) {
