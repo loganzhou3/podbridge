@@ -267,17 +267,68 @@ export const ingestPodcast = createServerFn({ method: "POST" })
     return { podcastId: pod.id as string };
   });
 
-export const listPodcasts = createServerFn({ method: "GET" }).handler(async () => {
-  const { data, error } = await supabaseAdmin
-    .from("podcasts")
-    .select(
-      "id,title,author,image_url,category,episode_count,latest_episode_at,update_frequency_days,commercial_score,activity_score,growth_score,lifecycle_stage,audience_tags",
-    )
-    .order("commercial_score", { ascending: false })
-    .limit(100);
-  if (error) throw new Error(error.message);
-  return { podcasts: data ?? [] };
-});
+export const listPodcasts = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        brand: z.string().trim().max(100).optional().nullable(),
+        category: z.string().trim().max(100).optional().nullable(),
+      })
+      .partial()
+      .optional()
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    const brand = data?.brand?.trim();
+    const category = data?.category?.trim();
+
+    let podcastIds: string[] | null = null;
+    if (brand) {
+      const { data: br, error: brErr } = await supabaseAdmin
+        .from("brand_recommendations")
+        .select("podcast_id")
+        .ilike("brand_name", `%${brand}%`);
+      if (brErr) throw new Error(brErr.message);
+      podcastIds = Array.from(new Set((br ?? []).map((r) => r.podcast_id)));
+      if (podcastIds.length === 0) return { podcasts: [] };
+    }
+
+    let q = supabaseAdmin
+      .from("podcasts")
+      .select(
+        "id,title,author,image_url,category,episode_count,latest_episode_at,update_frequency_days,commercial_score,activity_score,growth_score,lifecycle_stage,audience_tags",
+      )
+      .order("commercial_score", { ascending: false })
+      .limit(100);
+    if (podcastIds) q = q.in("id", podcastIds);
+    if (category) q = q.ilike("category", `%${category}%`);
+
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+    return { podcasts: rows ?? [] };
+  });
+
+export const listBrandCategories = createServerFn({ method: "GET" }).handler(
+  async () => {
+    const { data, error } = await supabaseAdmin
+      .from("brand_recommendations")
+      .select("category")
+      .not("category", "is", null)
+      .limit(500);
+    if (error) throw new Error(error.message);
+    const counts = new Map<string, number>();
+    for (const r of data ?? []) {
+      const c = (r.category ?? "").trim();
+      if (!c) continue;
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    const categories = Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 24)
+      .map(([name, count]) => ({ name, count }));
+    return { categories };
+  },
+);
 
 export const getPodcastDetail = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))

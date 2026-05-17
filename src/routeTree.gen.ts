@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PodcastIdRouteImport } from './routes/podcast.$id'
+import { Route as ApiPublicHooksStrategyRefreshRouteImport } from './routes/api/public/hooks/strategy-refresh'
 import { Route as ApiPublicHooksDailyRefreshRouteImport } from './routes/api/public/hooks/daily-refresh'
 
 const DashboardRoute = DashboardRouteImport.update({
@@ -29,6 +30,12 @@ const PodcastIdRoute = PodcastIdRouteImport.update({
   path: '/podcast/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksStrategyRefreshRoute =
+  ApiPublicHooksStrategyRefreshRouteImport.update({
+    id: '/api/public/hooks/strategy-refresh',
+    path: '/api/public/hooks/strategy-refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksDailyRefreshRoute =
   ApiPublicHooksDailyRefreshRouteImport.update({
     id: '/api/public/hooks/daily-refresh',
@@ -41,12 +48,14 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/podcast/$id': typeof PodcastIdRoute
   '/api/public/hooks/daily-refresh': typeof ApiPublicHooksDailyRefreshRoute
+  '/api/public/hooks/strategy-refresh': typeof ApiPublicHooksStrategyRefreshRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/podcast/$id': typeof PodcastIdRoute
   '/api/public/hooks/daily-refresh': typeof ApiPublicHooksDailyRefreshRoute
+  '/api/public/hooks/strategy-refresh': typeof ApiPublicHooksStrategyRefreshRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -54,6 +63,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/podcast/$id': typeof PodcastIdRoute
   '/api/public/hooks/daily-refresh': typeof ApiPublicHooksDailyRefreshRoute
+  '/api/public/hooks/strategy-refresh': typeof ApiPublicHooksStrategyRefreshRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -62,14 +72,21 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/podcast/$id'
     | '/api/public/hooks/daily-refresh'
+    | '/api/public/hooks/strategy-refresh'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/podcast/$id' | '/api/public/hooks/daily-refresh'
+  to:
+    | '/'
+    | '/dashboard'
+    | '/podcast/$id'
+    | '/api/public/hooks/daily-refresh'
+    | '/api/public/hooks/strategy-refresh'
   id:
     | '__root__'
     | '/'
     | '/dashboard'
     | '/podcast/$id'
     | '/api/public/hooks/daily-refresh'
+    | '/api/public/hooks/strategy-refresh'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,6 +94,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   PodcastIdRoute: typeof PodcastIdRoute
   ApiPublicHooksDailyRefreshRoute: typeof ApiPublicHooksDailyRefreshRoute
+  ApiPublicHooksStrategyRefreshRoute: typeof ApiPublicHooksStrategyRefreshRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -102,6 +120,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PodcastIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/strategy-refresh': {
+      id: '/api/public/hooks/strategy-refresh'
+      path: '/api/public/hooks/strategy-refresh'
+      fullPath: '/api/public/hooks/strategy-refresh'
+      preLoaderRoute: typeof ApiPublicHooksStrategyRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/daily-refresh': {
       id: '/api/public/hooks/daily-refresh'
       path: '/api/public/hooks/daily-refresh'
@@ -117,6 +142,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   PodcastIdRoute: PodcastIdRoute,
   ApiPublicHooksDailyRefreshRoute: ApiPublicHooksDailyRefreshRoute,
+  ApiPublicHooksStrategyRefreshRoute: ApiPublicHooksStrategyRefreshRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
