@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { SiteHeader } from "@/components/site-header";
 import { RssIngestForm } from "@/components/rss-ingest-form";
-import { listPodcasts } from "@/lib/podcast.functions";
+import { listPodcasts, listBrandCategories } from "@/lib/podcast.functions";
 import { Badge } from "@/components/ui/badge";
-import { Activity, Clock, Tag, TrendingUp, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Activity, Clock, Tag, TrendingUp, Loader2, Search, X } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -47,12 +50,38 @@ function ScoreBar({ value, label }: { value: number; label: string }) {
 
 function DashboardPage() {
   const list = useServerFn(listPodcasts);
+  const listCats = useServerFn(listBrandCategories);
+
+  const [brandInput, setBrandInput] = useState("");
+  const [brand, setBrand] = useState("");
+  const [category, setCategory] = useState("");
+
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["podcasts"],
-    queryFn: () => list(),
+    queryKey: ["podcasts", brand, category],
+    queryFn: () =>
+      list({
+        data: {
+          brand: brand || undefined,
+          category: category || undefined,
+        },
+      }),
+  });
+
+  const { data: catData } = useQuery({
+    queryKey: ["brand-categories"],
+    queryFn: () => listCats(),
   });
 
   const podcasts = data?.podcasts ?? [];
+  const cats = catData?.categories ?? [];
+  const hasFilter = !!(brand || category);
+
+  const applyBrand = () => setBrand(brandInput.trim());
+  const clearFilters = () => {
+    setBrand("");
+    setBrandInput("");
+    setCategory("");
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -67,16 +96,76 @@ function DashboardPage() {
           </div>
           <div className="hidden text-right md:block">
             <div className="text-2xl font-bold tabular-nums">{podcasts.length}</div>
-            <div className="text-xs text-muted-foreground">已分析播客</div>
+            <div className="text-xs text-muted-foreground">
+              {hasFilter ? "符合筛选" : "已分析播客"}
+            </div>
           </div>
         </div>
 
         <div
-          className="mb-10 rounded-xl border border-border bg-card p-4"
+          className="mb-6 rounded-xl border border-border bg-card p-4"
           style={{ boxShadow: "var(--shadow-card)" }}
         >
           <div className="mb-3 text-sm font-medium">添加新播客分析</div>
           <RssIngestForm />
+        </div>
+
+        <div
+          className="mb-8 rounded-xl border border-border bg-card p-4"
+          style={{ boxShadow: "var(--shadow-card)" }}
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-sm font-medium">按品牌候选筛选</div>
+            {hasFilter && (
+              <Button size="sm" variant="ghost" onClick={clearFilters}>
+                <X className="h-3.5 w-3.5" />
+                清除
+              </Button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative max-w-xs flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={brandInput}
+                onChange={(e) => setBrandInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && applyBrand()}
+                placeholder="搜索品牌名（如：瑞幸、京东）"
+                className="pl-8"
+              />
+            </div>
+            <Button size="sm" onClick={applyBrand}>
+              搜索
+            </Button>
+          </div>
+          {cats.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setCategory("")}
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  category === ""
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                全部品类
+              </button>
+              {cats.map((c) => (
+                <button
+                  key={c.name}
+                  onClick={() => setCategory(c.name === category ? "" : c.name)}
+                  className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                    category === c.name
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {c.name}
+                  <span className="ml-1 opacity-60">{c.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {isLoading && (
@@ -86,10 +175,10 @@ function DashboardPage() {
         )}
 
         {!isLoading && podcasts.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border p-16 text-center">
-            <p className="text-muted-foreground">
-              还没有分析过的播客，上方粘贴一个 RSS 链接开始
-            </p>
+          <div className="rounded-xl border border-dashed border-border p-16 text-center text-muted-foreground">
+            {hasFilter
+              ? "当前筛选条件下没有匹配的播客，尝试调整品牌或品类"
+              : "还没有分析过的播客，上方粘贴一个 RSS 链接开始"}
           </div>
         )}
 
