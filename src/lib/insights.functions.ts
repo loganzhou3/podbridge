@@ -400,3 +400,111 @@ export const listBrandRecommendations = createServerFn({ method: "GET" })
     if (error) throw new Error(error.message);
     return { brands: rows ?? [] };
   });
+
+// ---------- Campaign Planner (GPT-5) ----------
+export const planCampaign = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        brandName: z.string().trim().min(1).max(200),
+        productDescription: z.string().trim().min(5).max(2000),
+        goal: z.string().trim().min(1).max(100),
+        budgetRmb: z.number().min(1000).max(100_000_000),
+        targetTier: z.enum(["头部", "腰部", "长尾", "混合"]),
+        audienceNotes: z.string().trim().max(500).optional().nullable(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    // Pull top candidate podcasts to ground the AI in real inventory
+    const { data: pods } = await supabaseAdmin
+      .from("podcasts")
+      .select(
+        "id,title,author,category,audience_tags,commercial_score,activity_score,growth_score,lifecycle_stage,update_frequency_days,xiaoyuzhou_subscribers,ximalaya_plays",
+      )
+      .order("commercial_score", { ascending: false })
+      .limit(40);
+
+    const tierFilter = (p: NonNullable<typeof pods>[number]) => {
+      const subs = p.xiaoyuzhou_subscribers ?? 0;
+      if (data.targetTier === "头部") return subs >= 50000 || (p.commercial_score ?? 0) >= 80;
+      if (data.targetTier === "腰部")
+        return (subs >= 5000 && subs < 50000) || ((p.commercial_score ?? 0) >= 60 && (p.commercial_score ?? 0) < 80);
+      if (data.targetTier === "长尾") return subs < 5000 && (p.commercial_score ?? 0) < 60;
+      return true;
+    };
+
+    const candidates = (pods ?? []).filter(tierFilter).slice(0, 20);
+    const inventoryText = candidates
+      .map(
+        (p, i) =>
+          `${i + 1}. [${p.id.slice(0, 8)}] ${p.title}｜${p.category ?? "未分类"}｜标签：${(p.audience_tags ?? []).slice(0, 4).join("/") || "无"}｜商业${p.commercial_score}/活跃${p.activity_score}/增长${p.growth_score}｜${p.lifecycle_stage ?? "?"}｜订阅 ${p.xiaoyuzhou_subscribers ?? "?"}`,
+      )
+      .join("\n");
+
+    const prompt = `你是一位资深中文播客广告投放规划师，正在为以下品牌做投放方案规划。
+
+【品牌信息】
+- 品牌：${data.brandName}
+- 产品描述：${data.productDescription}
+- 投放目的：${data.goal}
+- 预算（人民币）：¥${data.budgetRmb.toLocaleString()}
+- 目标层级：${data.targetTier}
+${data.audienceNotes ? `- 目标人群补充：${data.audienceNotes}` : ""}
+
+【当前可投放播客库存 Top ${candidates.length}】
+${inventoryText || "（暂无符合层级的播客，请给出通用建议）"}
+
+请基于上述真实库存，规划完整投放方案。严格按以下 JSON Schema 返回（不要任何额外文字或 markdown）：
+{
+  "strategy_summary": "120 字以内的整体策略概述",
+  "recommended_format": "推荐的主投形式（口播/中插/冠名/定制单集）及原因",
+  "budget_allocation": [
+    { "bucket": "类别名（如：腰部口播 / 头部冠名 / 测试单集）", "amount_rmb": 数字, "percentage": 数字, "rationale": "原因（30字内）" }
+  ],
+  "selected_podcasts": [
+    { "podcast_id": "上方库存的完整 UUID", "title": "播客名", "suggested_format": "口播/中插/冠名", "estimated_cpm_rmb": 数字, "estimated_episodes": 数字, "expected_reach": 数字, "fit_reason": "为什么选它（30字内）" }
+  ],
+  "kpi_forecast": {
+    "total_reach": 数字,
+    "estimated_clicks": 数字,
+    "estimated_conversions": 数字,
+    "estimated_cpa_rmb": 数字
+  },
+  "timeline_weeks": 数字,
+  "risk_warnings": ["风险点 1", "风险点 2"],
+  "next_steps": ["下一步 1", "下一步 2", "下一步 3"]
+}
+要求：
+- selected_podcasts 必须从上方库存中选择，podcast_id 用上方括号中标注的前缀去匹配，但返回完整 UUID（从上方原文复制）。若库存为空可省略此字段或返回空数组。
+- budget_allocation 总和应等于总预算。
+- 所有金额按人民币元。`;
+
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY 未配置");
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai/gpt-5",
+        messages: [
+          { role: "system", content: "你是中文播客广告投放规划专家，只输出严格 JSON。" },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (res.status === 429) throw new Error("AI 调用过于频繁，请稍后再试");
+    if (res.status === 402) throw new Error("AI 额度已用尽，请在 Settings → Usage 添加额度");
+    if (!res.ok) throw new Error(`AI 调用失败：${res.status}`);
+    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const raw = json.choices?.[0]?.message?.content ?? "";
+    const parsed = safeParseJson(raw);
+    if (!parsed) throw new Error("AI 返回格式无法解析");
+
+    return {
+      plan: parsed,
+      inventorySize: candidates.length,
+      model: "openai/gpt-5",
+    };
+  });
