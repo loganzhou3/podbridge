@@ -5,6 +5,11 @@ import { getPodcastDetail } from "@/lib/podcast.functions";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
 import {
+  AdStrategyPanel,
+  BrandPanel,
+  PlatformLinksPanel,
+} from "@/components/insights-panels";
+import {
   Area,
   AreaChart,
   Bar,
