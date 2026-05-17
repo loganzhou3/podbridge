@@ -200,11 +200,24 @@ export function BrandPanel({ podcastId }: { podcastId: string }) {
 
       {data && data.brands.length > 0 && (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {data.brands.map((b) => (
+          {data.brands.map((b, idx) => (
             <div
               key={b.id}
-              className="rounded-lg border border-border bg-muted/30 p-4"
+              className="relative rounded-lg border border-border bg-muted/30 p-4"
             >
+              <div
+                className={`absolute -left-2 -top-2 grid h-6 w-6 place-items-center rounded-full text-[10px] font-bold text-primary-foreground ${
+                  idx === 0
+                    ? "bg-amber-500"
+                    : idx === 1
+                      ? "bg-zinc-400"
+                      : idx === 2
+                        ? "bg-orange-600"
+                        : "bg-muted-foreground"
+                }`}
+              >
+                {idx + 1}
+              </div>
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="text-sm font-semibold">{b.brand_name}</div>
