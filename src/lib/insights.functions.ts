@@ -243,7 +243,7 @@ ${(eps ?? []).map((e, i) => `${i + 1}. ${e.title}`).join("\n")}
     await supabaseAdmin
       .from("podcasts")
       .update({
-        ai_strategy: parsed as unknown as object,
+        ai_strategy: parsed as unknown as never,
         ai_strategy_at: new Date().toISOString(),
       })
       .eq("id", data.podcastId);
