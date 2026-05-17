@@ -5,6 +5,11 @@ import { getPodcastDetail } from "@/lib/podcast.functions";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
 import {
+  AdStrategyPanel,
+  BrandPanel,
+  PlatformLinksPanel,
+} from "@/components/insights-panels";
+import {
   Area,
   AreaChart,
   Bar,
@@ -219,6 +224,30 @@ function PodcastDetail() {
             </div>
           </div>
         )}
+
+        {/* Platform links + scraped data */}
+        <div className="mt-6">
+          <PlatformLinksPanel
+            podcastId={p.id}
+            xiaoyuzhouUrl={p.xiaoyuzhou_url ?? null}
+            ximalayaUrl={p.ximalaya_url ?? null}
+            xiaoyuzhouSubs={p.xiaoyuzhou_subscribers ?? null}
+            ximalayaPlays={p.ximalaya_plays ?? null}
+          />
+        </div>
+
+        {/* AI ad strategy */}
+        <div className="mt-6">
+          <AdStrategyPanel
+            podcastId={p.id}
+            initialStrategy={(p.ai_strategy as never) ?? null}
+          />
+        </div>
+
+        {/* Brand recommendations */}
+        <div className="mt-6">
+          <BrandPanel podcastId={p.id} />
+        </div>
 
         {/* Charts */}
         <div className="mt-6 grid gap-6 lg:grid-cols-2">

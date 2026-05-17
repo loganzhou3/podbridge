@@ -14,6 +14,78 @@ export type Database = {
   }
   public: {
     Tables: {
+      brand_contacts_cache: {
+        Row: {
+          brand_key: string
+          brand_name: string
+          contact_email: string | null
+          fetched_at: string
+          notes: string | null
+          raw: Json | null
+          website: string | null
+        }
+        Insert: {
+          brand_key: string
+          brand_name: string
+          contact_email?: string | null
+          fetched_at?: string
+          notes?: string | null
+          raw?: Json | null
+          website?: string | null
+        }
+        Update: {
+          brand_key?: string
+          brand_name?: string
+          contact_email?: string | null
+          fetched_at?: string
+          notes?: string | null
+          raw?: Json | null
+          website?: string | null
+        }
+        Relationships: []
+      }
+      brand_recommendations: {
+        Row: {
+          brand_name: string
+          category: string | null
+          contact_email: string | null
+          contact_notes: string | null
+          contacts_fetched_at: string | null
+          created_at: string
+          fit_score: number | null
+          id: string
+          podcast_id: string
+          reason: string | null
+          website: string | null
+        }
+        Insert: {
+          brand_name: string
+          category?: string | null
+          contact_email?: string | null
+          contact_notes?: string | null
+          contacts_fetched_at?: string | null
+          created_at?: string
+          fit_score?: number | null
+          id?: string
+          podcast_id: string
+          reason?: string | null
+          website?: string | null
+        }
+        Update: {
+          brand_name?: string
+          category?: string | null
+          contact_email?: string | null
+          contact_notes?: string | null
+          contacts_fetched_at?: string | null
+          created_at?: string
+          fit_score?: number | null
+          id?: string
+          podcast_id?: string
+          reason?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
       episodes: {
         Row: {
           audio_url: string | null
@@ -61,6 +133,8 @@ export type Database = {
       podcasts: {
         Row: {
           activity_score: number | null
+          ai_strategy: Json | null
+          ai_strategy_at: string | null
           audience_tags: string[] | null
           author: string | null
           avg_duration_minutes: number | null
@@ -83,9 +157,15 @@ export type Database = {
           title: string | null
           update_frequency_days: number | null
           updated_at: string
+          xiaoyuzhou_subscribers: number | null
+          xiaoyuzhou_url: string | null
+          ximalaya_plays: number | null
+          ximalaya_url: string | null
         }
         Insert: {
           activity_score?: number | null
+          ai_strategy?: Json | null
+          ai_strategy_at?: string | null
           audience_tags?: string[] | null
           author?: string | null
           avg_duration_minutes?: number | null
@@ -108,9 +188,15 @@ export type Database = {
           title?: string | null
           update_frequency_days?: number | null
           updated_at?: string
+          xiaoyuzhou_subscribers?: number | null
+          xiaoyuzhou_url?: string | null
+          ximalaya_plays?: number | null
+          ximalaya_url?: string | null
         }
         Update: {
           activity_score?: number | null
+          ai_strategy?: Json | null
+          ai_strategy_at?: string | null
           audience_tags?: string[] | null
           author?: string | null
           avg_duration_minutes?: number | null
@@ -133,6 +219,10 @@ export type Database = {
           title?: string | null
           update_frequency_days?: number | null
           updated_at?: string
+          xiaoyuzhou_subscribers?: number | null
+          xiaoyuzhou_url?: string | null
+          ximalaya_plays?: number | null
+          ximalaya_url?: string | null
         }
         Relationships: []
       }

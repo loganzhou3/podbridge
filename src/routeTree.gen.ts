@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PodcastIdRouteImport } from './routes/podcast.$id'
+import { Route as ApiPublicHooksDailyRefreshRouteImport } from './routes/api/public/hooks/daily-refresh'
 
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
@@ -28,35 +29,54 @@ const PodcastIdRoute = PodcastIdRouteImport.update({
   path: '/podcast/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksDailyRefreshRoute =
+  ApiPublicHooksDailyRefreshRouteImport.update({
+    id: '/api/public/hooks/daily-refresh',
+    path: '/api/public/hooks/daily-refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/podcast/$id': typeof PodcastIdRoute
+  '/api/public/hooks/daily-refresh': typeof ApiPublicHooksDailyRefreshRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/podcast/$id': typeof PodcastIdRoute
+  '/api/public/hooks/daily-refresh': typeof ApiPublicHooksDailyRefreshRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/podcast/$id': typeof PodcastIdRoute
+  '/api/public/hooks/daily-refresh': typeof ApiPublicHooksDailyRefreshRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/podcast/$id'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/podcast/$id'
+    | '/api/public/hooks/daily-refresh'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/podcast/$id'
-  id: '__root__' | '/' | '/dashboard' | '/podcast/$id'
+  to: '/' | '/dashboard' | '/podcast/$id' | '/api/public/hooks/daily-refresh'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/podcast/$id'
+    | '/api/public/hooks/daily-refresh'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   PodcastIdRoute: typeof PodcastIdRoute
+  ApiPublicHooksDailyRefreshRoute: typeof ApiPublicHooksDailyRefreshRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PodcastIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/daily-refresh': {
+      id: '/api/public/hooks/daily-refresh'
+      path: '/api/public/hooks/daily-refresh'
+      fullPath: '/api/public/hooks/daily-refresh'
+      preLoaderRoute: typeof ApiPublicHooksDailyRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +116,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   PodcastIdRoute: PodcastIdRoute,
+  ApiPublicHooksDailyRefreshRoute: ApiPublicHooksDailyRefreshRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
