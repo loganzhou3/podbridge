@@ -72,21 +72,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "PodMetrics — 中文播客数据分析平台" },
+      {
+        name: "description",
+        content:
+          "抓取喜马拉雅、小宇宙、Apple Podcasts 数据，分析中文播客的增长速度、用户活跃度、内容生命周期与商业价值。",
+      },
+      { property: "og:title", content: "PodMetrics — 中文播客数据分析平台" },
+      { property: "og:description", content: "为广告主与 MCN 提供专业的中文播客数据洞察。" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-    ],
+    links: [{ rel: "stylesheet", href: appCss }],
   }),
   shellComponent: RootShell,
   component: RootComponent,
