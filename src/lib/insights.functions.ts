@@ -112,7 +112,8 @@ export const scrapePodcastPlatforms = createServerFn({ method: "POST" })
     }
 
     const fc = getFirecrawl();
-    const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    let xiaoyuzhouSubs: number | null = null;
+    let ximalayaPlays: number | null = null;
 
     if (pod.xiaoyuzhou_url) {
       try {
@@ -121,11 +122,10 @@ export const scrapePodcastPlatforms = createServerFn({ method: "POST" })
           onlyMainContent: true,
         });
         const md = (r as { markdown?: string }).markdown ?? "";
-        const subs = extractNumber(md, [
+        xiaoyuzhouSubs = extractNumber(md, [
           /([\d.,]+\s*[万亿]?)\s*(?:订阅|关注)/,
           /(?:订阅|关注)\s*[:：]?\s*([\d.,]+\s*[万亿]?)/,
         ]);
-        if (subs != null) update.xiaoyuzhou_subscribers = subs;
       } catch (e) {
         console.error("xiaoyuzhou scrape failed", e);
       }
@@ -138,11 +138,10 @@ export const scrapePodcastPlatforms = createServerFn({ method: "POST" })
           onlyMainContent: true,
         });
         const md = (r as { markdown?: string }).markdown ?? "";
-        const plays = extractNumber(md, [
+        ximalayaPlays = extractNumber(md, [
           /([\d.,]+\s*[万亿]?)\s*(?:播放|次播放)/,
           /(?:播放量|总播放)\s*[:：]?\s*([\d.,]+\s*[万亿]?)/,
         ]);
-        if (plays != null) update.ximalaya_plays = plays;
       } catch (e) {
         console.error("ximalaya scrape failed", e);
       }
@@ -150,10 +149,14 @@ export const scrapePodcastPlatforms = createServerFn({ method: "POST" })
 
     const { error: upErr } = await supabaseAdmin
       .from("podcasts")
-      .update(update)
+      .update({
+        xiaoyuzhou_subscribers: xiaoyuzhouSubs,
+        ximalaya_plays: ximalayaPlays,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", data.podcastId);
     if (upErr) throw new Error(upErr.message);
-    return { ok: true, update };
+    return { ok: true, xiaoyuzhouSubs, ximalayaPlays };
   });
 
 // ---------- AI Ad Strategy ----------
