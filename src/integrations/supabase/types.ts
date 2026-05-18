@@ -153,6 +153,7 @@ export type Database = {
           last_synced_at: string | null
           latest_episode_at: string | null
           lifecycle_stage: string | null
+          market: string
           rss_url: string
           title: string | null
           update_frequency_days: number | null
@@ -184,6 +185,7 @@ export type Database = {
           last_synced_at?: string | null
           latest_episode_at?: string | null
           lifecycle_stage?: string | null
+          market?: string
           rss_url: string
           title?: string | null
           update_frequency_days?: number | null
@@ -215,6 +217,7 @@ export type Database = {
           last_synced_at?: string | null
           latest_episode_at?: string | null
           lifecycle_stage?: string | null
+          market?: string
           rss_url?: string
           title?: string | null
           update_frequency_days?: number | null
@@ -229,30 +232,42 @@ export type Database = {
       snapshots: {
         Row: {
           apple_rank: number | null
+          daily_play_delta: number | null
           episode_count: number | null
           estimated_reviews: number | null
           estimated_subscribers: number | null
           id: string
+          itunes_review_count: number | null
           podcast_id: string
           taken_at: string
+          xiaoyuzhou_subscribers: number | null
+          ximalaya_plays: number | null
         }
         Insert: {
           apple_rank?: number | null
+          daily_play_delta?: number | null
           episode_count?: number | null
           estimated_reviews?: number | null
           estimated_subscribers?: number | null
           id?: string
+          itunes_review_count?: number | null
           podcast_id: string
           taken_at?: string
+          xiaoyuzhou_subscribers?: number | null
+          ximalaya_plays?: number | null
         }
         Update: {
           apple_rank?: number | null
+          daily_play_delta?: number | null
           episode_count?: number | null
           estimated_reviews?: number | null
           estimated_subscribers?: number | null
           id?: string
+          itunes_review_count?: number | null
           podcast_id?: string
           taken_at?: string
+          xiaoyuzhou_subscribers?: number | null
+          ximalaya_plays?: number | null
         }
         Relationships: [
           {
