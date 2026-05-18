@@ -422,6 +422,7 @@ export const planCampaign = createServerFn({ method: "POST" })
       .select(
         "id,title,author,category,audience_tags,commercial_score,activity_score,growth_score,lifecycle_stage,update_frequency_days,xiaoyuzhou_subscribers,ximalaya_plays",
       )
+      .eq("market", "cn")
       .order("commercial_score", { ascending: false })
       .limit(40);
 
