@@ -121,10 +121,16 @@ function scorePodcast(input: {
 
 export const ingestPodcast = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
-    z.object({ rssUrl: z.string().url().max(2048) }).parse(input),
+    z
+      .object({
+        rssUrl: z.string().url().max(2048),
+        market: z.enum(["cn", "na"]).optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data }) => {
     const rssUrl = data.rssUrl;
+    const market = data.market ?? "cn";
     const res = await fetch(rssUrl, {
       headers: { "User-Agent": "PodBridgeBot/1.0 (+https://podbridge.app)" },
     });
