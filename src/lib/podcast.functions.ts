@@ -376,7 +376,7 @@ export const getPodcastDetail = createServerFn({ method: "GET" })
         .limit(50),
       supabaseAdmin
         .from("snapshots")
-        .select("taken_at,episode_count,estimated_reviews,estimated_subscribers")
+        .select("taken_at,episode_count,estimated_reviews,estimated_subscribers,xiaoyuzhou_subscribers,ximalaya_plays,daily_play_delta")
         .eq("podcast_id", data.id)
         .order("taken_at", { ascending: true })
         .limit(60),
