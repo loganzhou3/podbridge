@@ -221,6 +221,7 @@ export const ingestPodcast = createServerFn({ method: "POST" })
       itunes_url: itunesUrl,
       category,
       language,
+      market,
       latest_episode_at: latest ? new Date(latest).toISOString() : null,
       first_episode_at: first ? new Date(first).toISOString() : null,
       episode_count: episodes.length,
@@ -258,7 +259,27 @@ export const ingestPodcast = createServerFn({ method: "POST" })
         .upsert(epRows, { onConflict: "podcast_id,guid" });
     }
 
-    // Snapshot for trend
+    // Snapshot for trend — include real platform metrics + compute daily play delta
+    const xySubs = (pod as { xiaoyuzhou_subscribers?: number | null }).xiaoyuzhou_subscribers ?? null;
+    const xmPlays = (pod as { ximalaya_plays?: number | null }).ximalaya_plays ?? null;
+    let dailyDelta: number | null = null;
+    if (xmPlays != null) {
+      const { data: prev } = await supabaseAdmin
+        .from("snapshots")
+        .select("ximalaya_plays,taken_at")
+        .eq("podcast_id", pod.id)
+        .not("ximalaya_plays", "is", null)
+        .order("taken_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (prev?.ximalaya_plays != null && prev.taken_at) {
+        const days = Math.max(
+          1,
+          (Date.now() - new Date(prev.taken_at).getTime()) / 86400000,
+        );
+        dailyDelta = Math.round(Math.max(0, xmPlays - prev.ximalaya_plays) / days);
+      }
+    }
     await supabaseAdmin.from("snapshots").insert({
       podcast_id: pod.id,
       episode_count: episodes.length,
@@ -268,6 +289,9 @@ export const ingestPodcast = createServerFn({ method: "POST" })
       estimated_subscribers: Math.round(
         episodes.length * 120 + scores.growth * 250 + scores.commercial * 80,
       ),
+      xiaoyuzhou_subscribers: xySubs,
+      ximalaya_plays: xmPlays,
+      daily_play_delta: dailyDelta,
     });
 
     return { podcastId: pod.id as string };
@@ -279,6 +303,7 @@ export const listPodcasts = createServerFn({ method: "POST" })
       .object({
         brand: z.string().trim().max(100).optional().nullable(),
         category: z.string().trim().max(100).optional().nullable(),
+        market: z.enum(["cn", "na"]).optional().nullable(),
       })
       .partial()
       .optional()
@@ -287,6 +312,7 @@ export const listPodcasts = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const brand = data?.brand?.trim();
     const category = data?.category?.trim();
+    const market = data?.market ?? "cn";
 
     let podcastIds: string[] | null = null;
     if (brand) {
@@ -302,8 +328,9 @@ export const listPodcasts = createServerFn({ method: "POST" })
     let q = supabaseAdmin
       .from("podcasts")
       .select(
-        "id,title,author,image_url,category,episode_count,latest_episode_at,update_frequency_days,commercial_score,activity_score,growth_score,lifecycle_stage,audience_tags",
+        "id,title,author,image_url,category,episode_count,latest_episode_at,update_frequency_days,commercial_score,activity_score,growth_score,lifecycle_stage,audience_tags,market,xiaoyuzhou_subscribers,ximalaya_plays",
       )
+      .eq("market", market)
       .order("commercial_score", { ascending: false })
       .limit(100);
     if (podcastIds) q = q.in("id", podcastIds);
