@@ -21,7 +21,7 @@ import {
 export const Route = createFileRoute("/planner")({
   head: () => ({
     meta: [
-      { title: "投放规划师 — PodMetrics" },
+      { title: "投放规划师 — PodBridge" },
       {
         name: "description",
         content: "输入品牌产品与预算，AI 自动生成中文播客投放方案。",

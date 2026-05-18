@@ -15,7 +15,7 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "PodMetrics — 中文播客数据分析平台" },
+      { title: "PodBridge — 播客数据与跨境投放平台" },
       {
         name: "description",
         content:
@@ -174,7 +174,7 @@ function Index() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-8 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
-            <span>PodMetrics · 中文播客数据平台</span>
+            <span>PodBridge · 播客数据 · 中文 + 海外</span>
           </div>
           <span>© {new Date().getFullYear()}</span>
         </div>

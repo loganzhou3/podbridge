@@ -126,7 +126,7 @@ export const ingestPodcast = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const rssUrl = data.rssUrl;
     const res = await fetch(rssUrl, {
-      headers: { "User-Agent": "PodMetricsBot/1.0 (+https://podmetrics.app)" },
+      headers: { "User-Agent": "PodBridgeBot/1.0 (+https://podbridge.app)" },
     });
     if (!res.ok) throw new Error(`无法获取 RSS（HTTP ${res.status}）`);
     const xml = await res.text();

@@ -12,8 +12,8 @@ export function SiteHeader() {
           >
             <Radio className="h-4 w-4" />
           </div>
-          <span className="text-base font-semibold tracking-tight">PodMetrics</span>
-          <span className="ml-1 text-xs text-muted-foreground">中文播客数据平台</span>
+          <span className="text-base font-semibold tracking-tight">PodBridge</span>
+          <span className="ml-1 text-xs text-muted-foreground">播客数据 · 中文/海外</span>
         </Link>
         <nav className="flex items-center gap-1 text-sm">
           <Link
@@ -37,6 +37,20 @@ export function SiteHeader() {
             activeProps={{ className: "rounded-md px-3 py-2 text-foreground bg-muted" }}
           >
             投放规划师
+          </Link>
+          <Link
+            to="/global"
+            className="rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            activeProps={{ className: "rounded-md px-3 py-2 text-foreground bg-muted" }}
+          >
+            🌎 出海
+          </Link>
+          <Link
+            to="/global/planner"
+            className="rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            activeProps={{ className: "rounded-md px-3 py-2 text-foreground bg-muted" }}
+          >
+            出海规划师
           </Link>
         </nav>
       </div>
