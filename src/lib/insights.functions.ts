@@ -422,6 +422,7 @@ export const planCampaign = createServerFn({ method: "POST" })
       .select(
         "id,title,author,category,audience_tags,commercial_score,activity_score,growth_score,lifecycle_stage,update_frequency_days,xiaoyuzhou_subscribers,ximalaya_plays",
       )
+      .eq("market", "cn")
       .order("commercial_score", { ascending: false })
       .limit(40);
 
@@ -501,6 +502,244 @@ ${inventoryText || "（暂无符合层级的播客，请给出通用建议）"}
     const raw = json.choices?.[0]?.message?.content ?? "";
     const parsed = safeParseJson(raw);
     if (!parsed) throw new Error("AI 返回格式无法解析");
+
+    return {
+      plan: parsed,
+      inventorySize: candidates.length,
+      model: "openai/gpt-5",
+    };
+  });
+
+// ============================================================
+// ============ OVERSEAS (NA / English) MODULE ================
+// ============================================================
+
+// ---------- AI Ad Strategy for North-American English podcasts ----------
+type OverseasStrategy = {
+  summary: string;
+  audience_persona: string;
+  best_ad_format: string;
+  recommended_cpm_usd: { min: number; max: number };
+  best_episode_slot: string;
+  do_list: string[];
+  dont_list: string[];
+  cross_border_brand_fit: string;
+  recommended_brands: Array<{
+    name: string;
+    category: string;
+    fit_score: number;
+    reason: string;
+  }>;
+};
+
+export const generateOverseasStrategy = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ podcastId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: pod, error } = await supabaseAdmin
+      .from("podcasts")
+      .select(
+        "id,title,author,description,category,audience_tags,episode_count,update_frequency_days,avg_duration_minutes,commercial_score,activity_score,growth_score,lifecycle_stage,language,itunes_url",
+      )
+      .eq("id", data.podcastId)
+      .single();
+    if (error || !pod) throw new Error("Podcast not found");
+
+    const { data: eps } = await supabaseAdmin
+      .from("episodes")
+      .select("title")
+      .eq("podcast_id", data.podcastId)
+      .order("pub_date", { ascending: false })
+      .limit(15);
+
+    const prompt = `You are a senior podcast advertising strategist focused on the North-American (US/Canada) English podcast market, advising Chinese cross-border (DTC / consumer / app / SaaS) brands looking to expand overseas.
+
+[Podcast]
+- Title: ${pod.title}
+- Host: ${pod.author ?? "unknown"}
+- Description: ${(pod.description ?? "").slice(0, 500)}
+- Category: ${pod.category ?? "uncategorized"}
+- Audience tags: ${(pod.audience_tags ?? []).join(", ") || "n/a"}
+- Episodes: ${pod.episode_count}, avg duration: ${pod.avg_duration_minutes ?? "?"} min
+- Update frequency: every ${pod.update_frequency_days ?? "?"} days
+- Scores: commercial ${pod.commercial_score} / activity ${pod.activity_score} / growth ${pod.growth_score}
+- Lifecycle: ${pod.lifecycle_stage}
+- Language: ${pod.language ?? "en"}
+- Apple URL: ${pod.itunes_url ?? "n/a"}
+
+[Last 15 episode titles]
+${(eps ?? []).map((e, i) => `${i + 1}. ${e.title}`).join("\n")}
+
+Return strict JSON (no markdown, no extra text) matching:
+{
+  "summary": "one-sentence ad-investment thesis",
+  "audience_persona": "<=140 chars describing the core US/Canada listener persona",
+  "best_ad_format": "host-read / mid-roll / pre-roll / branded segment — pick one with reason",
+  "recommended_cpm_usd": { "min": number, "max": number },
+  "best_episode_slot": "pre-roll / mid-roll / post-roll — pick best with reason",
+  "do_list": ["do 1", "do 2", "do 3"],
+  "dont_list": ["dont 1", "dont 2"],
+  "cross_border_brand_fit": "<=140 chars: which kind of Chinese cross-border brand best fits this show (e.g. SHEIN-style fast fashion, Anker-style consumer electronics, TikTok Shop sellers, Temu DTC, gaming apps)",
+  "recommended_brands": [
+    { "name": "real Chinese cross-border brand name (English or pinyin)", "category": "category", "fit_score": 1-100, "reason": "<=30 words why it fits" }
+  ]
+}
+Recommend 6-8 real Chinese cross-border / global brands (e.g. SHEIN, Anker, Temu, DJI, Insta360, Cider, Lenovo, Hisense, Xiaomi, Yeedi, Roborock, BYD, MiHoYo, ByteDance/TikTok apps, SHEGLAM, Ulike, Laifen) sorted by fit_score desc.`;
+
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY not configured");
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai/gpt-5",
+        messages: [
+          { role: "system", content: "You are a senior US podcast ad strategist. Output strict JSON only." },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (res.status === 429) throw new Error("AI rate-limited, please retry shortly");
+    if (res.status === 402) throw new Error("AI credits exhausted — top up in Settings → Usage");
+    if (!res.ok) throw new Error(`AI call failed: ${res.status}`);
+    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const raw = json.choices?.[0]?.message?.content ?? "";
+    const parsed = safeParseJson(raw) as OverseasStrategy | null;
+    if (!parsed) throw new Error("AI returned unparsable JSON");
+
+    await supabaseAdmin
+      .from("podcasts")
+      .update({
+        ai_strategy: parsed as unknown as never,
+        ai_strategy_at: new Date().toISOString(),
+      })
+      .eq("id", data.podcastId);
+
+    await supabaseAdmin
+      .from("brand_recommendations")
+      .delete()
+      .eq("podcast_id", data.podcastId);
+
+    if (parsed.recommended_brands?.length) {
+      await supabaseAdmin.from("brand_recommendations").insert(
+        parsed.recommended_brands.map((b) => ({
+          podcast_id: data.podcastId,
+          brand_name: b.name,
+          category: b.category,
+          fit_score: b.fit_score,
+          reason: b.reason,
+        })),
+      );
+    }
+
+    return { ok: true, strategy: parsed };
+  });
+
+// ---------- Cross-Border Campaign Planner (GPT-5, English NA inventory) ----------
+export const planCrossBorderCampaign = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        brandName: z.string().trim().min(1).max(200),
+        productDescription: z.string().trim().min(5).max(2000),
+        goal: z.string().trim().min(1).max(100),
+        budgetUsd: z.number().min(500).max(10_000_000),
+        targetTier: z.enum(["top", "mid", "long-tail", "mixed"]),
+        targetRegion: z.string().trim().max(200).optional().nullable(),
+        audienceNotes: z.string().trim().max(500).optional().nullable(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: pods } = await supabaseAdmin
+      .from("podcasts")
+      .select(
+        "id,title,author,category,audience_tags,commercial_score,activity_score,growth_score,lifecycle_stage,update_frequency_days,language,description",
+      )
+      .eq("market", "na")
+      .order("commercial_score", { ascending: false })
+      .limit(40);
+
+    const tierFilter = (p: NonNullable<typeof pods>[number]) => {
+      const c = p.commercial_score ?? 0;
+      if (data.targetTier === "top") return c >= 80;
+      if (data.targetTier === "mid") return c >= 55 && c < 80;
+      if (data.targetTier === "long-tail") return c < 55;
+      return true;
+    };
+
+    const candidates = (pods ?? []).filter(tierFilter).slice(0, 20);
+    const inventoryText = candidates
+      .map(
+        (p, i) =>
+          `${i + 1}. [${p.id.slice(0, 8)}] ${p.title} | ${p.category ?? "uncategorized"} | tags: ${(p.audience_tags ?? []).slice(0, 4).join("/") || "none"} | scores C${p.commercial_score}/A${p.activity_score}/G${p.growth_score} | ${p.lifecycle_stage ?? "?"}`,
+      )
+      .join("\n");
+
+    const prompt = `You are a senior cross-border podcast advertising strategist. A Chinese brand is planning to advertise on North-American English podcasts to expand overseas.
+
+[Brand]
+- Brand: ${data.brandName}
+- Product: ${data.productDescription}
+- Goal: ${data.goal}
+- Budget (USD): $${data.budgetUsd.toLocaleString()}
+- Target tier: ${data.targetTier}
+${data.targetRegion ? `- Target region: ${data.targetRegion}` : "- Target region: US/Canada"}
+${data.audienceNotes ? `- Audience notes: ${data.audienceNotes}` : ""}
+
+[Available NA podcast inventory — top ${candidates.length}]
+${inventoryText || "(inventory is empty — give general guidance only)"}
+
+Return strict JSON (no markdown, no extra text):
+{
+  "strategy_summary": "<=180 chars overall strategy",
+  "recommended_format": "host-read / mid-roll / branded segment — pick one with rationale",
+  "cultural_localization_tips": ["tip 1", "tip 2", "tip 3"],
+  "budget_allocation": [
+    { "bucket": "e.g. Mid-tier host-read / Top branded / Test pilot", "amount_usd": number, "percentage": number, "rationale": "<=30 words" }
+  ],
+  "selected_podcasts": [
+    { "podcast_id": "full UUID from inventory above", "title": "title", "suggested_format": "host-read/mid-roll/branded", "estimated_cpm_usd": number, "estimated_episodes": number, "expected_reach": number, "fit_reason": "<=30 words" }
+  ],
+  "kpi_forecast": {
+    "total_reach": number,
+    "estimated_clicks": number,
+    "estimated_conversions": number,
+    "estimated_cpa_usd": number
+  },
+  "timeline_weeks": number,
+  "risk_warnings": ["risk 1", "risk 2"],
+  "next_steps": ["step 1", "step 2", "step 3"]
+}
+Rules:
+- selected_podcasts must come from the inventory above; return the full UUID.
+- Total budget_allocation amounts should equal the total budget.
+- All amounts in USD.
+- Tailor cultural_localization_tips specifically to a Chinese brand entering NA (brand naming, claims, voice/accent, FTC disclosure).`;
+
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("LOVABLE_API_KEY not configured");
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "openai/gpt-5",
+        messages: [
+          { role: "system", content: "You are a cross-border podcast ad strategist. Output strict JSON only." },
+          { role: "user", content: prompt },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (res.status === 429) throw new Error("AI rate-limited, please retry shortly");
+    if (res.status === 402) throw new Error("AI credits exhausted — top up in Settings → Usage");
+    if (!res.ok) throw new Error(`AI call failed: ${res.status}`);
+    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const raw = json.choices?.[0]?.message?.content ?? "";
+    const parsed = safeParseJson(raw);
+    if (!parsed) throw new Error("AI returned unparsable JSON");
 
     return {
       plan: parsed,

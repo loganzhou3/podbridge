@@ -13,7 +13,7 @@ import { Activity, Clock, Tag, TrendingUp, Loader2, Search, X } from "lucide-rea
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
-      { title: "Dashboard — PodMetrics" },
+      { title: "Dashboard — PodBridge" },
       { name: "description", content: "对比所有已分析的中文播客，按商业价值排序。" },
     ],
   }),

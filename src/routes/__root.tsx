@@ -74,14 +74,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "PodMetrics — 中文播客数据分析平台" },
+      { title: "PodBridge — 播客数据与跨境投放平台" },
       {
         name: "description",
         content:
-          "抓取喜马拉雅、小宇宙、Apple Podcasts 数据，分析中文播客的增长速度、用户活跃度、内容生命周期与商业价值。",
+          "抓取喜马拉雅、小宇宙、Apple Podcasts 与北美英文播客数据，为广告主与跨境品牌提供商业价值评分与 AI 投放策略。",
       },
-      { property: "og:title", content: "PodMetrics — 中文播客数据分析平台" },
-      { property: "og:description", content: "为广告主与 MCN 提供专业的中文播客数据洞察。" },
+      { property: "og:title", content: "PodBridge — 播客数据与跨境投放平台" },
+      { property: "og:description", content: "连接中文播客与海外品牌、连接中国品牌与北美英文播客。" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
