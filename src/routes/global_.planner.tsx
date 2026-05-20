@@ -20,7 +20,7 @@ import {
   Languages,
 } from "lucide-react";
 
-export const Route = createFileRoute("/global/planner")({
+export const Route = createFileRoute("/global_/planner")({
   head: () => ({
     meta: [
       { title: "Cross-Border Planner — PodBridge" },
