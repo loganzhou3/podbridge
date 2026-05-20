@@ -487,7 +487,7 @@ ${inventoryText || "（暂无符合层级的播客，请给出通用建议）"}
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai/gpt-5",
+        model: "openai/gpt-5-mini",
         messages: [
           { role: "system", content: "你是中文播客广告投放规划专家，只输出严格 JSON。" },
           { role: "user", content: prompt },
@@ -506,7 +506,7 @@ ${inventoryText || "（暂无符合层级的播客，请给出通用建议）"}
     return {
       plan: parsed,
       inventorySize: candidates.length,
-      model: "openai/gpt-5",
+      model: "openai/gpt-5-mini",
     };
   });
 
@@ -593,7 +593,7 @@ Recommend 6-8 real Chinese cross-border / global brands (e.g. SHEIN, Anker, Temu
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai/gpt-5",
+        model: "openai/gpt-5-mini",
         messages: [
           { role: "system", content: "You are a senior US podcast ad strategist. Output strict JSON only." },
           { role: "user", content: prompt },
@@ -725,7 +725,7 @@ Rules:
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "openai/gpt-5",
+        model: "openai/gpt-5-mini",
         messages: [
           { role: "system", content: "You are a cross-border podcast ad strategist. Output strict JSON only." },
           { role: "user", content: prompt },
@@ -744,6 +744,6 @@ Rules:
     return {
       plan: parsed,
       inventorySize: candidates.length,
-      model: "openai/gpt-5",
+      model: "openai/gpt-5-mini",
     };
   });
