@@ -14,7 +14,7 @@ import { Route as GlobalRouteImport } from './routes/global'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PodcastIdRouteImport } from './routes/podcast.$id'
-import { Route as GlobalPlannerRouteImport } from './routes/global.planner'
+import { Route as GlobalPlannerRouteImport } from './routes/global_.planner'
 import { Route as ApiPublicHooksStrategyRefreshRouteImport } from './routes/api/public/hooks/strategy-refresh'
 import { Route as ApiPublicHooksDailyRefreshRouteImport } from './routes/api/public/hooks/daily-refresh'
 
@@ -44,9 +44,9 @@ const PodcastIdRoute = PodcastIdRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const GlobalPlannerRoute = GlobalPlannerRouteImport.update({
-  id: '/planner',
-  path: '/planner',
-  getParentRoute: () => GlobalRoute,
+  id: '/global_/planner',
+  path: '/global/planner',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicHooksStrategyRefreshRoute =
   ApiPublicHooksStrategyRefreshRouteImport.update({
@@ -64,7 +64,7 @@ const ApiPublicHooksDailyRefreshRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/global': typeof GlobalRouteWithChildren
+  '/global': typeof GlobalRoute
   '/planner': typeof PlannerRoute
   '/global/planner': typeof GlobalPlannerRoute
   '/podcast/$id': typeof PodcastIdRoute
@@ -74,7 +74,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/global': typeof GlobalRouteWithChildren
+  '/global': typeof GlobalRoute
   '/planner': typeof PlannerRoute
   '/global/planner': typeof GlobalPlannerRoute
   '/podcast/$id': typeof PodcastIdRoute
@@ -85,9 +85,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
-  '/global': typeof GlobalRouteWithChildren
+  '/global': typeof GlobalRoute
   '/planner': typeof PlannerRoute
-  '/global/planner': typeof GlobalPlannerRoute
+  '/global_/planner': typeof GlobalPlannerRoute
   '/podcast/$id': typeof PodcastIdRoute
   '/api/public/hooks/daily-refresh': typeof ApiPublicHooksDailyRefreshRoute
   '/api/public/hooks/strategy-refresh': typeof ApiPublicHooksStrategyRefreshRoute
@@ -119,7 +119,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/global'
     | '/planner'
-    | '/global/planner'
+    | '/global_/planner'
     | '/podcast/$id'
     | '/api/public/hooks/daily-refresh'
     | '/api/public/hooks/strategy-refresh'
@@ -128,8 +128,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
-  GlobalRoute: typeof GlobalRouteWithChildren
+  GlobalRoute: typeof GlobalRoute
   PlannerRoute: typeof PlannerRoute
+  GlobalPlannerRoute: typeof GlobalPlannerRoute
   PodcastIdRoute: typeof PodcastIdRoute
   ApiPublicHooksDailyRefreshRoute: typeof ApiPublicHooksDailyRefreshRoute
   ApiPublicHooksStrategyRefreshRoute: typeof ApiPublicHooksStrategyRefreshRoute
@@ -172,12 +173,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PodcastIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/global/planner': {
-      id: '/global/planner'
-      path: '/planner'
+    '/global_/planner': {
+      id: '/global_/planner'
+      path: '/global/planner'
       fullPath: '/global/planner'
       preLoaderRoute: typeof GlobalPlannerRouteImport
-      parentRoute: typeof GlobalRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/strategy-refresh': {
       id: '/api/public/hooks/strategy-refresh'
@@ -196,22 +197,12 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface GlobalRouteChildren {
-  GlobalPlannerRoute: typeof GlobalPlannerRoute
-}
-
-const GlobalRouteChildren: GlobalRouteChildren = {
-  GlobalPlannerRoute: GlobalPlannerRoute,
-}
-
-const GlobalRouteWithChildren =
-  GlobalRoute._addFileChildren(GlobalRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
-  GlobalRoute: GlobalRouteWithChildren,
+  GlobalRoute: GlobalRoute,
   PlannerRoute: PlannerRoute,
+  GlobalPlannerRoute: GlobalPlannerRoute,
   PodcastIdRoute: PodcastIdRoute,
   ApiPublicHooksDailyRefreshRoute: ApiPublicHooksDailyRefreshRoute,
   ApiPublicHooksStrategyRefreshRoute: ApiPublicHooksStrategyRefreshRoute,
@@ -219,3 +210,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
