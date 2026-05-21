@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { SiteHeader } from "@/components/site-header";
 import { RssIngestForm } from "@/components/rss-ingest-form";
+import { BulkIngestForm } from "@/components/bulk-ingest-form";
 import { listPodcasts, listBrandCategories } from "@/lib/podcast.functions";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
