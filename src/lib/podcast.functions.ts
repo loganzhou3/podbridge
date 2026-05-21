@@ -71,6 +71,44 @@ function readTextValue(value: unknown): string {
   return "";
 }
 
+function normalizeImageUrl(value: unknown): string | null {
+  if (typeof value === "string") return value.trim() || null;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return readTextValue(record.href ?? record.url ?? record.link ?? record["@_href"] ?? record["@_url"]) || null;
+  }
+  return null;
+}
+
+function mapRss2JsonFeed(payload: Rss2JsonPayload) {
+  const feed = payload.feed ?? {};
+  const items = Array.isArray(payload.items) ? payload.items : [];
+
+  return {
+    channel: {
+      title: readTextValue(feed.title),
+      "itunes:author": readTextValue(feed.author),
+      author: readTextValue(feed.author),
+      description: readTextValue(feed.description),
+      image: { url: normalizeImageUrl(feed.image) },
+      language: readTextValue(feed.language),
+      "itunes:category": readTextValue(feed.category)
+        ? [{ "@_text": readTextValue(feed.category) }]
+        : [],
+      item: items.map((item) => ({
+        guid: readTextValue(item.guid || item.link || item.title),
+        title: readTextValue(item.title),
+        description: readTextValue(item.description || item.content),
+        pubDate: readTextValue(item.pubDate),
+        "itunes:duration": readTextValue(item.duration),
+        enclosure: {
+          "@_url": readTextValue(item.enclosure || item.thumbnail || item.link),
+        },
+      })),
+    },
+  };
+}
+
 async function fetchRssContent(rssUrl: string): Promise<FetchRssResult> {
   const readText = async (res: Response) => {
     try {
@@ -329,10 +367,22 @@ export const ingestPodcast = createServerFn({ method: "POST" })
       };
     }
 
-    const xml = rssFetch.xml;
-    const doc = parser.parse(xml);
+    const doc =
+      rssFetch.format === "xml"
+        ? parser.parse(rssFetch.xml)
+        : mapRss2JsonFeed(rssFetch.payload);
     const channel = doc?.rss?.channel ?? doc?.feed;
-    if (!channel) throw new Error("RSS 格式无法识别");
+    if (!channel) {
+      return {
+        ok: false,
+        error: "RSS 内容无法识别，返回的可能是网页而不是播客源，请换一个官方 RSS 地址再试",
+        status: 422,
+        source: rssFetch.source,
+        blockedSource: false,
+        fallbackTried: rssFetch.source !== "direct",
+        podcastId: null,
+      };
+    }
 
     const title = String(channel.title ?? "").trim() || "未命名播客";
     const author = String(channel["itunes:author"] ?? channel.author ?? "").trim();
