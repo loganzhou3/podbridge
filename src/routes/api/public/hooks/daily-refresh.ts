@@ -30,12 +30,6 @@ export const Route = createFileRoute("/api/public/hooks/daily-refresh")({
               }
             }
             // 2) Re-ingest RSS — writes a fresh snapshot incl. daily delta
-            await ingestPodcast({
-              data: {
-                rssUrl: p.rss_url,
-                market: (p.market === "na" ? "na" : "cn") as "cn" | "na",
-              },
-            });
             const ingestResult = await ingestPodcast({
               data: {
                 rssUrl: p.rss_url,
