@@ -24,8 +24,16 @@ type IngestPodcastResult =
       podcastId: null;
     };
 
-async function fetchRssContent(rssUrl: string): Promise<
-  | { ok: true; xml: string; source: string }
+type Rss2JsonPayload = {
+  status?: string;
+  message?: string;
+  feed?: Record<string, unknown>;
+  items?: Array<Record<string, unknown>>;
+};
+
+type FetchRssResult =
+  | { ok: true; source: string; format: "xml"; xml: string }
+  | { ok: true; source: string; format: "rss2json"; payload: Rss2JsonPayload }
   | {
       ok: false;
       status: number;
@@ -33,8 +41,75 @@ async function fetchRssContent(rssUrl: string): Promise<
       source: string;
       blockedSource: boolean;
       fallbackTried: boolean;
-    }
-> {
+    };
+
+function looksLikeHtmlPayload(value: string) {
+  const s = value.trim().toLowerCase();
+  return s.startsWith("<!doctype html") || s.startsWith("<html") || s.includes("<body");
+}
+
+function looksLikeXmlPayload(value: string) {
+  const s = value.trim().toLowerCase();
+  if (!s.startsWith("<")) return false;
+  if (looksLikeHtmlPayload(s)) return false;
+  return (
+    s.startsWith("<?xml") ||
+    s.startsWith("<rss") ||
+    s.startsWith("<feed") ||
+    s.startsWith("<rdf:rdf")
+  );
+}
+
+function readTextValue(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return String(record["#text"] ?? record["@_text"] ?? record.value ?? "").trim();
+  }
+  return "";
+}
+
+function normalizeImageUrl(value: unknown): string | null {
+  if (typeof value === "string") return value.trim() || null;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return readTextValue(record.href ?? record.url ?? record.link ?? record["@_href"] ?? record["@_url"]) || null;
+  }
+  return null;
+}
+
+function mapRss2JsonFeed(payload: Rss2JsonPayload) {
+  const feed = payload.feed ?? {};
+  const items = Array.isArray(payload.items) ? payload.items : [];
+
+  return {
+    channel: {
+      title: readTextValue(feed.title),
+      "itunes:author": readTextValue(feed.author),
+      author: readTextValue(feed.author),
+      description: readTextValue(feed.description),
+      image: { url: normalizeImageUrl(feed.image) },
+      language: readTextValue(feed.language),
+      "itunes:category": readTextValue(feed.category)
+        ? [{ "@_text": readTextValue(feed.category) }]
+        : [],
+      item: items.map((item) => ({
+        guid: readTextValue(item.guid || item.link || item.title),
+        title: readTextValue(item.title),
+        description: readTextValue(item.description || item.content),
+        pubDate: readTextValue(item.pubDate),
+        "itunes:duration": readTextValue(item.duration),
+        enclosure: {
+          "@_url": readTextValue(item.enclosure || item.thumbnail || item.link),
+        },
+      })),
+    },
+  };
+}
+
+async function fetchRssContent(rssUrl: string): Promise<FetchRssResult> {
   const readText = async (res: Response) => {
     try {
       return await res.text();
@@ -44,21 +119,33 @@ async function fetchRssContent(rssUrl: string): Promise<
   };
 
   const attempts = [
-    { source: "direct", url: rssUrl, mode: "text" as const },
+    { source: "direct", url: rssUrl, mode: "text" as const, headers: RSS_FETCH_HEADERS },
     {
       source: "allorigins-raw",
       url: `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,
       mode: "text" as const,
+      headers: RSS_FETCH_HEADERS,
     },
     {
       source: "allorigins-get",
       url: `https://api.allorigins.win/get?disableCache=true&url=${encodeURIComponent(rssUrl)}`,
       mode: "allorigins" as const,
+      headers: RSS_FETCH_HEADERS,
     },
     {
       source: "codetabs",
       url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
       mode: "text" as const,
+      headers: RSS_FETCH_HEADERS,
+    },
+    {
+      source: "rss2json",
+      url: `https://api.rss2json.com/v1/api.json?count=100&rss_url=${encodeURIComponent(rssUrl)}`,
+      mode: "rss2json" as const,
+      headers: {
+        "User-Agent": RSS_FETCH_HEADERS["User-Agent"],
+        Accept: "application/json, text/plain;q=0.9, */*;q=0.5",
+      },
     },
   ];
 
@@ -66,6 +153,7 @@ async function fetchRssContent(rssUrl: string): Promise<
   let lastError = "";
   let lastSource = "direct";
   let fallbackTried = false;
+  let sawBlockedSource = false;
 
   for (let i = 0; i < attempts.length; i++) {
     const attempt = attempts[i];
@@ -75,16 +163,26 @@ async function fetchRssContent(rssUrl: string): Promise<
 
     try {
       const res = await fetch(attempt.url, {
-        headers: RSS_FETCH_HEADERS,
+        headers: attempt.headers,
         redirect: "follow",
       });
 
       lastStatus = res.status;
+      if (RSS_BLOCK_STATUSES.has(res.status)) sawBlockedSource = true;
       if (!res.ok) {
         lastError = (await readText(res)).slice(0, 300) || res.statusText || "request failed";
         if (!isFallback && !RSS_BLOCK_STATUSES.has(res.status)) {
           break;
         }
+        continue;
+      }
+
+      if (attempt.mode === "rss2json") {
+        const payload = (await res.json().catch(() => null)) as Rss2JsonPayload | null;
+        if (payload?.status === "ok" && payload.feed) {
+          return { ok: true, source: attempt.source, format: "rss2json", payload };
+        }
+        lastError = payload?.message?.trim() || "rss2json returned no feed";
         continue;
       }
 
@@ -101,11 +199,18 @@ async function fetchRssContent(rssUrl: string): Promise<
         xml = (await res.text()).trim();
       }
 
-      if (xml) {
-        return { ok: true, xml, source: attempt.source };
+      if (!xml) {
+        lastError = "empty response body";
+        continue;
       }
 
-      lastError = "empty response body";
+      if (looksLikeXmlPayload(xml)) {
+        return { ok: true, source: attempt.source, format: "xml", xml };
+      }
+
+      lastError = looksLikeHtmlPayload(xml)
+        ? "response is HTML, not RSS XML"
+        : "response is not a valid RSS/Atom XML payload";
     } catch (error) {
       lastError = error instanceof Error ? error.message : "request failed";
     }
@@ -116,7 +221,7 @@ async function fetchRssContent(rssUrl: string): Promise<
     status: lastStatus || 500,
     error: lastError || "无法获取 RSS",
     source: lastSource,
-    blockedSource: RSS_BLOCK_STATUSES.has(lastStatus),
+    blockedSource: sawBlockedSource || RSS_BLOCK_STATUSES.has(lastStatus),
     fallbackTried,
   };
 }
@@ -262,83 +367,95 @@ export const ingestPodcast = createServerFn({ method: "POST" })
       };
     }
 
-    const xml = rssFetch.xml;
-    const doc = parser.parse(xml);
-    const channel = doc?.rss?.channel ?? doc?.feed;
-    if (!channel) throw new Error("RSS 格式无法识别");
-
-    const title = String(channel.title ?? "").trim() || "未命名播客";
-    const author = String(channel["itunes:author"] ?? channel.author ?? "").trim();
-    const description = String(channel.description ?? channel["itunes:summary"] ?? "").trim();
-    const image =
-      channel["itunes:image"]?.["@_href"] ??
-      channel.image?.url ??
-      channel.image?.["@_href"] ??
-      null;
-    const language = String(channel.language ?? "zh-cn");
-    const cats = asArray(channel["itunes:category"] as unknown);
-    const category =
-      (cats[0] as { "@_text"?: string })?.["@_text"] ?? null;
-
-    const items = asArray(channel.item ?? channel.entry);
-    const episodes = items
-      .map((it: Record<string, unknown>) => {
-        const pub = it.pubDate ?? it.published ?? it["dc:date"];
-        const d = pub ? new Date(String(pub)) : null;
-        const enclosure = it.enclosure as { "@_url"?: string } | undefined;
+    try {
+      const doc =
+        rssFetch.format === "xml"
+          ? parser.parse(rssFetch.xml)
+          : mapRss2JsonFeed(rssFetch.payload);
+      const channel = doc?.rss?.channel ?? doc?.feed;
+      if (!channel) {
         return {
-          guid: String((it.guid as { "#text"?: string })?.["#text"] ?? it.guid ?? it.id ?? "") || null,
-          title: String(it.title ?? "").trim(),
-          description: String(it.description ?? it.summary ?? "").trim().slice(0, 2000),
-          pub_date: d && !isNaN(d.getTime()) ? d.toISOString() : null,
-          duration_seconds: parseDuration(it["itunes:duration"]),
-          audio_url: enclosure?.["@_url"] ?? null,
+          ok: false,
+          error: "RSS 内容无法识别，返回的可能是网页而不是播客源，请换一个官方 RSS 地址再试",
+          status: 422,
+          source: rssFetch.source,
+          blockedSource: false,
+          fallbackTried: rssFetch.source !== "direct",
+          podcastId: null,
         };
-      })
-      .filter((e) => e.title);
+      }
 
-    const sortedDates = episodes
+      const title = String(channel.title ?? "").trim() || "未命名播客";
+      const author = String(channel["itunes:author"] ?? channel.author ?? "").trim();
+      const description = String(channel.description ?? channel["itunes:summary"] ?? "").trim();
+      const image =
+        channel["itunes:image"]?.["@_href"] ??
+        channel.image?.url ??
+        channel.image?.["@_href"] ??
+        null;
+      const language = String(channel.language ?? "zh-cn");
+      const cats = asArray(channel["itunes:category"] as unknown);
+      const category =
+        (cats[0] as { "@_text"?: string })?.["@_text"] ?? null;
+
+      const items = asArray(channel.item ?? channel.entry);
+      const episodes = items
+        .map((it: Record<string, unknown>) => {
+          const pub = it.pubDate ?? it.published ?? it["dc:date"];
+          const d = pub ? new Date(String(pub)) : null;
+          const enclosure = it.enclosure as { "@_url"?: string } | undefined;
+          return {
+            guid: String((it.guid as { "#text"?: string })?.["#text"] ?? it.guid ?? it.id ?? "") || null,
+            title: String(it.title ?? "").trim(),
+            description: String(it.description ?? it.summary ?? "").trim().slice(0, 2000),
+            pub_date: d && !isNaN(d.getTime()) ? d.toISOString() : null,
+            duration_seconds: parseDuration(it["itunes:duration"]),
+            audio_url: enclosure?.["@_url"] ?? null,
+          };
+        })
+        .filter((e) => e.title);
+
+      const sortedDates = episodes
       .map((e) => (e.pub_date ? new Date(e.pub_date).getTime() : null))
       .filter((x): x is number => x != null)
       .sort((a, b) => b - a);
 
-    const latest = sortedDates[0] ?? null;
-    const first = sortedDates[sortedDates.length - 1] ?? null;
-    const daysSinceLatest = latest ? (Date.now() - latest) / 86400000 : 9999;
+      const latest = sortedDates[0] ?? null;
+      const first = sortedDates[sortedDates.length - 1] ?? null;
+      const daysSinceLatest = latest ? (Date.now() - latest) / 86400000 : 9999;
 
-    let updateFreqDays: number | null = null;
-    if (sortedDates.length >= 3) {
-      const gaps: number[] = [];
-      for (let i = 0; i < Math.min(sortedDates.length - 1, 20); i++) {
-        gaps.push((sortedDates[i] - sortedDates[i + 1]) / 86400000);
+      let updateFreqDays: number | null = null;
+      if (sortedDates.length >= 3) {
+        const gaps: number[] = [];
+        for (let i = 0; i < Math.min(sortedDates.length - 1, 20); i++) {
+          gaps.push((sortedDates[i] - sortedDates[i + 1]) / 86400000);
+        }
+        updateFreqDays =
+          Math.round((gaps.reduce((a, b) => a + b, 0) / gaps.length) * 10) / 10;
       }
-      updateFreqDays =
-        Math.round((gaps.reduce((a, b) => a + b, 0) / gaps.length) * 10) / 10;
-    }
 
-    const durations = episodes
+      const durations = episodes
       .map((e) => e.duration_seconds)
       .filter((x): x is number => x != null && x > 0);
-    const avgDurationMin = durations.length
-      ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length / 60)
-      : null;
+      const avgDurationMin = durations.length
+        ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length / 60)
+        : null;
 
-    // Apple lookup
-    let apple = await lookupAppleByFeed(rssUrl);
-    if (!apple && title) apple = await lookupAppleByTitle(title);
-    const itunesId = apple?.collectionId ? String(apple.collectionId) : null;
-    const itunesUrl = (apple?.collectionViewUrl as string | undefined) ?? null;
+      let apple = await lookupAppleByFeed(rssUrl);
+      if (!apple && title) apple = await lookupAppleByTitle(title);
+      const itunesId = apple?.collectionId ? String(apple.collectionId) : null;
+      const itunesUrl = (apple?.collectionViewUrl as string | undefined) ?? null;
 
-    const tags = deriveTags(channel, episodes);
-    const scores = scorePodcast({
-      episodeCount: episodes.length,
-      updateFreqDays,
-      daysSinceLatest,
-      avgDuration: avgDurationMin,
-      hasApple: !!apple,
-    });
+      const tags = deriveTags(channel, episodes);
+      const scores = scorePodcast({
+        episodeCount: episodes.length,
+        updateFreqDays,
+        daysSinceLatest,
+        avgDuration: avgDurationMin,
+        hasApple: !!apple,
+      });
 
-    const upsertRow = {
+      const upsertRow = {
       rss_url: rssUrl,
       title,
       author,
@@ -363,65 +480,74 @@ export const ingestPodcast = createServerFn({ method: "POST" })
       updated_at: new Date().toISOString(),
     };
 
-    const { data: pod, error } = await supabaseAdmin
+      const { data: pod, error } = await supabaseAdmin
       .from("podcasts")
       .upsert(upsertRow, { onConflict: "rss_url" })
       .select("*")
       .single();
-    if (error) throw new Error(error.message);
+      if (error) throw new Error(error.message);
 
-    // Replace episodes (limit 100)
-    const epRows = episodes.slice(0, 100).map((e) => ({
-      podcast_id: pod.id,
-      guid: e.guid || `${pod.id}:${e.title}`,
-      title: e.title,
-      description: e.description,
-      pub_date: e.pub_date,
-      duration_seconds: e.duration_seconds,
-      audio_url: e.audio_url,
-    }));
-    if (epRows.length) {
-      await supabaseAdmin
-        .from("episodes")
-        .upsert(epRows, { onConflict: "podcast_id,guid" });
-    }
-
-    // Snapshot for trend — include real platform metrics + compute daily play delta
-    const xySubs = (pod as { xiaoyuzhou_subscribers?: number | null }).xiaoyuzhou_subscribers ?? null;
-    const xmPlays = (pod as { ximalaya_plays?: number | null }).ximalaya_plays ?? null;
-    let dailyDelta: number | null = null;
-    if (xmPlays != null) {
-      const { data: prev } = await supabaseAdmin
-        .from("snapshots")
-        .select("ximalaya_plays,taken_at")
-        .eq("podcast_id", pod.id)
-        .not("ximalaya_plays", "is", null)
-        .order("taken_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (prev?.ximalaya_plays != null && prev.taken_at) {
-        const days = Math.max(
-          1,
-          (Date.now() - new Date(prev.taken_at).getTime()) / 86400000,
-        );
-        dailyDelta = Math.round(Math.max(0, xmPlays - prev.ximalaya_plays) / days);
+      const epRows = episodes.slice(0, 100).map((e) => ({
+        podcast_id: pod.id,
+        guid: e.guid || `${pod.id}:${e.title}`,
+        title: e.title,
+        description: e.description,
+        pub_date: e.pub_date,
+        duration_seconds: e.duration_seconds,
+        audio_url: e.audio_url,
+      }));
+      if (epRows.length) {
+        await supabaseAdmin
+          .from("episodes")
+          .upsert(epRows, { onConflict: "podcast_id,guid" });
       }
-    }
-    await supabaseAdmin.from("snapshots").insert({
-      podcast_id: pod.id,
-      episode_count: episodes.length,
-      estimated_reviews: Math.round(
-        episodes.length * 8 + scores.activity * 3 + scores.growth * 2,
-      ),
-      estimated_subscribers: Math.round(
-        episodes.length * 120 + scores.growth * 250 + scores.commercial * 80,
-      ),
-      xiaoyuzhou_subscribers: xySubs,
-      ximalaya_plays: xmPlays,
-      daily_play_delta: dailyDelta,
-    });
 
-    return { ok: true, podcastId: pod.id as string, source: rssFetch.source };
+      const xySubs = (pod as { xiaoyuzhou_subscribers?: number | null }).xiaoyuzhou_subscribers ?? null;
+      const xmPlays = (pod as { ximalaya_plays?: number | null }).ximalaya_plays ?? null;
+      let dailyDelta: number | null = null;
+      if (xmPlays != null) {
+        const { data: prev } = await supabaseAdmin
+          .from("snapshots")
+          .select("ximalaya_plays,taken_at")
+          .eq("podcast_id", pod.id)
+          .not("ximalaya_plays", "is", null)
+          .order("taken_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (prev?.ximalaya_plays != null && prev.taken_at) {
+          const days = Math.max(
+            1,
+            (Date.now() - new Date(prev.taken_at).getTime()) / 86400000,
+          );
+          dailyDelta = Math.round(Math.max(0, xmPlays - prev.ximalaya_plays) / days);
+        }
+      }
+      await supabaseAdmin.from("snapshots").insert({
+        podcast_id: pod.id,
+        episode_count: episodes.length,
+        estimated_reviews: Math.round(
+          episodes.length * 8 + scores.activity * 3 + scores.growth * 2,
+        ),
+        estimated_subscribers: Math.round(
+          episodes.length * 120 + scores.growth * 250 + scores.commercial * 80,
+        ),
+        xiaoyuzhou_subscribers: xySubs,
+        ximalaya_plays: xmPlays,
+        daily_play_delta: dailyDelta,
+      });
+
+      return { ok: true, podcastId: pod.id as string, source: rssFetch.source };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "播客导入失败，请稍后重试",
+        status: 500,
+        source: rssFetch.source,
+        blockedSource: false,
+        fallbackTried: rssFetch.source !== "direct",
+        podcastId: null,
+      };
+    }
   });
 
 export const listPodcasts = createServerFn({ method: "POST" })
