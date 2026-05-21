@@ -24,8 +24,16 @@ type IngestPodcastResult =
       podcastId: null;
     };
 
-async function fetchRssContent(rssUrl: string): Promise<
-  | { ok: true; xml: string; source: string }
+type Rss2JsonPayload = {
+  status?: string;
+  message?: string;
+  feed?: Record<string, unknown>;
+  items?: Array<Record<string, unknown>>;
+};
+
+type FetchRssResult =
+  | { ok: true; source: string; format: "xml"; xml: string }
+  | { ok: true; source: string; format: "rss2json"; payload: Rss2JsonPayload }
   | {
       ok: false;
       status: number;
@@ -33,8 +41,37 @@ async function fetchRssContent(rssUrl: string): Promise<
       source: string;
       blockedSource: boolean;
       fallbackTried: boolean;
-    }
-> {
+    };
+
+function looksLikeHtmlPayload(value: string) {
+  const s = value.trim().toLowerCase();
+  return s.startsWith("<!doctype html") || s.startsWith("<html") || s.includes("<body");
+}
+
+function looksLikeXmlPayload(value: string) {
+  const s = value.trim().toLowerCase();
+  if (!s.startsWith("<")) return false;
+  if (looksLikeHtmlPayload(s)) return false;
+  return (
+    s.startsWith("<?xml") ||
+    s.startsWith("<rss") ||
+    s.startsWith("<feed") ||
+    s.startsWith("<rdf:rdf")
+  );
+}
+
+function readTextValue(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return String(record["#text"] ?? record["@_text"] ?? record.value ?? "").trim();
+  }
+  return "";
+}
+
+async function fetchRssContent(rssUrl: string): Promise<FetchRssResult> {
   const readText = async (res: Response) => {
     try {
       return await res.text();
@@ -44,21 +81,33 @@ async function fetchRssContent(rssUrl: string): Promise<
   };
 
   const attempts = [
-    { source: "direct", url: rssUrl, mode: "text" as const },
+    { source: "direct", url: rssUrl, mode: "text" as const, headers: RSS_FETCH_HEADERS },
     {
       source: "allorigins-raw",
       url: `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,
       mode: "text" as const,
+      headers: RSS_FETCH_HEADERS,
     },
     {
       source: "allorigins-get",
       url: `https://api.allorigins.win/get?disableCache=true&url=${encodeURIComponent(rssUrl)}`,
       mode: "allorigins" as const,
+      headers: RSS_FETCH_HEADERS,
     },
     {
       source: "codetabs",
       url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
       mode: "text" as const,
+      headers: RSS_FETCH_HEADERS,
+    },
+    {
+      source: "rss2json",
+      url: `https://api.rss2json.com/v1/api.json?count=100&rss_url=${encodeURIComponent(rssUrl)}`,
+      mode: "rss2json" as const,
+      headers: {
+        "User-Agent": RSS_FETCH_HEADERS["User-Agent"],
+        Accept: "application/json, text/plain;q=0.9, */*;q=0.5",
+      },
     },
   ];
 
@@ -66,6 +115,7 @@ async function fetchRssContent(rssUrl: string): Promise<
   let lastError = "";
   let lastSource = "direct";
   let fallbackTried = false;
+  let sawBlockedSource = false;
 
   for (let i = 0; i < attempts.length; i++) {
     const attempt = attempts[i];
@@ -75,16 +125,26 @@ async function fetchRssContent(rssUrl: string): Promise<
 
     try {
       const res = await fetch(attempt.url, {
-        headers: RSS_FETCH_HEADERS,
+        headers: attempt.headers,
         redirect: "follow",
       });
 
       lastStatus = res.status;
+      if (RSS_BLOCK_STATUSES.has(res.status)) sawBlockedSource = true;
       if (!res.ok) {
         lastError = (await readText(res)).slice(0, 300) || res.statusText || "request failed";
         if (!isFallback && !RSS_BLOCK_STATUSES.has(res.status)) {
           break;
         }
+        continue;
+      }
+
+      if (attempt.mode === "rss2json") {
+        const payload = (await res.json().catch(() => null)) as Rss2JsonPayload | null;
+        if (payload?.status === "ok" && payload.feed) {
+          return { ok: true, source: attempt.source, format: "rss2json", payload };
+        }
+        lastError = payload?.message?.trim() || "rss2json returned no feed";
         continue;
       }
 
@@ -101,11 +161,18 @@ async function fetchRssContent(rssUrl: string): Promise<
         xml = (await res.text()).trim();
       }
 
-      if (xml) {
-        return { ok: true, xml, source: attempt.source };
+      if (!xml) {
+        lastError = "empty response body";
+        continue;
       }
 
-      lastError = "empty response body";
+      if (looksLikeXmlPayload(xml)) {
+        return { ok: true, source: attempt.source, format: "xml", xml };
+      }
+
+      lastError = looksLikeHtmlPayload(xml)
+        ? "response is HTML, not RSS XML"
+        : "response is not a valid RSS/Atom XML payload";
     } catch (error) {
       lastError = error instanceof Error ? error.message : "request failed";
     }
@@ -116,7 +183,7 @@ async function fetchRssContent(rssUrl: string): Promise<
     status: lastStatus || 500,
     error: lastError || "无法获取 RSS",
     source: lastSource,
-    blockedSource: RSS_BLOCK_STATUSES.has(lastStatus),
+    blockedSource: sawBlockedSource || RSS_BLOCK_STATUSES.has(lastStatus),
     fallbackTried,
   };
 }
