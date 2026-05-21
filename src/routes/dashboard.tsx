@@ -109,6 +109,9 @@ function DashboardPage() {
         >
           <div className="mb-3 text-sm font-medium">添加新播客分析</div>
           <RssIngestForm />
+          <div className="my-4 border-t border-border" />
+          <div className="mb-3 text-sm font-medium">批量导入</div>
+          <BulkIngestForm />
         </div>
 
         <div
