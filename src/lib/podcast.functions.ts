@@ -367,95 +367,95 @@ export const ingestPodcast = createServerFn({ method: "POST" })
       };
     }
 
-    const doc =
-      rssFetch.format === "xml"
-        ? parser.parse(rssFetch.xml)
-        : mapRss2JsonFeed(rssFetch.payload);
-    const channel = doc?.rss?.channel ?? doc?.feed;
-    if (!channel) {
-      return {
-        ok: false,
-        error: "RSS 内容无法识别，返回的可能是网页而不是播客源，请换一个官方 RSS 地址再试",
-        status: 422,
-        source: rssFetch.source,
-        blockedSource: false,
-        fallbackTried: rssFetch.source !== "direct",
-        podcastId: null,
-      };
-    }
-
-    const title = String(channel.title ?? "").trim() || "未命名播客";
-    const author = String(channel["itunes:author"] ?? channel.author ?? "").trim();
-    const description = String(channel.description ?? channel["itunes:summary"] ?? "").trim();
-    const image =
-      channel["itunes:image"]?.["@_href"] ??
-      channel.image?.url ??
-      channel.image?.["@_href"] ??
-      null;
-    const language = String(channel.language ?? "zh-cn");
-    const cats = asArray(channel["itunes:category"] as unknown);
-    const category =
-      (cats[0] as { "@_text"?: string })?.["@_text"] ?? null;
-
-    const items = asArray(channel.item ?? channel.entry);
-    const episodes = items
-      .map((it: Record<string, unknown>) => {
-        const pub = it.pubDate ?? it.published ?? it["dc:date"];
-        const d = pub ? new Date(String(pub)) : null;
-        const enclosure = it.enclosure as { "@_url"?: string } | undefined;
+    try {
+      const doc =
+        rssFetch.format === "xml"
+          ? parser.parse(rssFetch.xml)
+          : mapRss2JsonFeed(rssFetch.payload);
+      const channel = doc?.rss?.channel ?? doc?.feed;
+      if (!channel) {
         return {
-          guid: String((it.guid as { "#text"?: string })?.["#text"] ?? it.guid ?? it.id ?? "") || null,
-          title: String(it.title ?? "").trim(),
-          description: String(it.description ?? it.summary ?? "").trim().slice(0, 2000),
-          pub_date: d && !isNaN(d.getTime()) ? d.toISOString() : null,
-          duration_seconds: parseDuration(it["itunes:duration"]),
-          audio_url: enclosure?.["@_url"] ?? null,
+          ok: false,
+          error: "RSS 内容无法识别，返回的可能是网页而不是播客源，请换一个官方 RSS 地址再试",
+          status: 422,
+          source: rssFetch.source,
+          blockedSource: false,
+          fallbackTried: rssFetch.source !== "direct",
+          podcastId: null,
         };
-      })
-      .filter((e) => e.title);
+      }
 
-    const sortedDates = episodes
+      const title = String(channel.title ?? "").trim() || "未命名播客";
+      const author = String(channel["itunes:author"] ?? channel.author ?? "").trim();
+      const description = String(channel.description ?? channel["itunes:summary"] ?? "").trim();
+      const image =
+        channel["itunes:image"]?.["@_href"] ??
+        channel.image?.url ??
+        channel.image?.["@_href"] ??
+        null;
+      const language = String(channel.language ?? "zh-cn");
+      const cats = asArray(channel["itunes:category"] as unknown);
+      const category =
+        (cats[0] as { "@_text"?: string })?.["@_text"] ?? null;
+
+      const items = asArray(channel.item ?? channel.entry);
+      const episodes = items
+        .map((it: Record<string, unknown>) => {
+          const pub = it.pubDate ?? it.published ?? it["dc:date"];
+          const d = pub ? new Date(String(pub)) : null;
+          const enclosure = it.enclosure as { "@_url"?: string } | undefined;
+          return {
+            guid: String((it.guid as { "#text"?: string })?.["#text"] ?? it.guid ?? it.id ?? "") || null,
+            title: String(it.title ?? "").trim(),
+            description: String(it.description ?? it.summary ?? "").trim().slice(0, 2000),
+            pub_date: d && !isNaN(d.getTime()) ? d.toISOString() : null,
+            duration_seconds: parseDuration(it["itunes:duration"]),
+            audio_url: enclosure?.["@_url"] ?? null,
+          };
+        })
+        .filter((e) => e.title);
+
+      const sortedDates = episodes
       .map((e) => (e.pub_date ? new Date(e.pub_date).getTime() : null))
       .filter((x): x is number => x != null)
       .sort((a, b) => b - a);
 
-    const latest = sortedDates[0] ?? null;
-    const first = sortedDates[sortedDates.length - 1] ?? null;
-    const daysSinceLatest = latest ? (Date.now() - latest) / 86400000 : 9999;
+      const latest = sortedDates[0] ?? null;
+      const first = sortedDates[sortedDates.length - 1] ?? null;
+      const daysSinceLatest = latest ? (Date.now() - latest) / 86400000 : 9999;
 
-    let updateFreqDays: number | null = null;
-    if (sortedDates.length >= 3) {
-      const gaps: number[] = [];
-      for (let i = 0; i < Math.min(sortedDates.length - 1, 20); i++) {
-        gaps.push((sortedDates[i] - sortedDates[i + 1]) / 86400000);
+      let updateFreqDays: number | null = null;
+      if (sortedDates.length >= 3) {
+        const gaps: number[] = [];
+        for (let i = 0; i < Math.min(sortedDates.length - 1, 20); i++) {
+          gaps.push((sortedDates[i] - sortedDates[i + 1]) / 86400000);
+        }
+        updateFreqDays =
+          Math.round((gaps.reduce((a, b) => a + b, 0) / gaps.length) * 10) / 10;
       }
-      updateFreqDays =
-        Math.round((gaps.reduce((a, b) => a + b, 0) / gaps.length) * 10) / 10;
-    }
 
-    const durations = episodes
+      const durations = episodes
       .map((e) => e.duration_seconds)
       .filter((x): x is number => x != null && x > 0);
-    const avgDurationMin = durations.length
-      ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length / 60)
-      : null;
+      const avgDurationMin = durations.length
+        ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length / 60)
+        : null;
 
-    // Apple lookup
-    let apple = await lookupAppleByFeed(rssUrl);
-    if (!apple && title) apple = await lookupAppleByTitle(title);
-    const itunesId = apple?.collectionId ? String(apple.collectionId) : null;
-    const itunesUrl = (apple?.collectionViewUrl as string | undefined) ?? null;
+      let apple = await lookupAppleByFeed(rssUrl);
+      if (!apple && title) apple = await lookupAppleByTitle(title);
+      const itunesId = apple?.collectionId ? String(apple.collectionId) : null;
+      const itunesUrl = (apple?.collectionViewUrl as string | undefined) ?? null;
 
-    const tags = deriveTags(channel, episodes);
-    const scores = scorePodcast({
-      episodeCount: episodes.length,
-      updateFreqDays,
-      daysSinceLatest,
-      avgDuration: avgDurationMin,
-      hasApple: !!apple,
-    });
+      const tags = deriveTags(channel, episodes);
+      const scores = scorePodcast({
+        episodeCount: episodes.length,
+        updateFreqDays,
+        daysSinceLatest,
+        avgDuration: avgDurationMin,
+        hasApple: !!apple,
+      });
 
-    const upsertRow = {
+      const upsertRow = {
       rss_url: rssUrl,
       title,
       author,
@@ -480,65 +480,74 @@ export const ingestPodcast = createServerFn({ method: "POST" })
       updated_at: new Date().toISOString(),
     };
 
-    const { data: pod, error } = await supabaseAdmin
+      const { data: pod, error } = await supabaseAdmin
       .from("podcasts")
       .upsert(upsertRow, { onConflict: "rss_url" })
       .select("*")
       .single();
-    if (error) throw new Error(error.message);
+      if (error) throw new Error(error.message);
 
-    // Replace episodes (limit 100)
-    const epRows = episodes.slice(0, 100).map((e) => ({
-      podcast_id: pod.id,
-      guid: e.guid || `${pod.id}:${e.title}`,
-      title: e.title,
-      description: e.description,
-      pub_date: e.pub_date,
-      duration_seconds: e.duration_seconds,
-      audio_url: e.audio_url,
-    }));
-    if (epRows.length) {
-      await supabaseAdmin
-        .from("episodes")
-        .upsert(epRows, { onConflict: "podcast_id,guid" });
-    }
-
-    // Snapshot for trend — include real platform metrics + compute daily play delta
-    const xySubs = (pod as { xiaoyuzhou_subscribers?: number | null }).xiaoyuzhou_subscribers ?? null;
-    const xmPlays = (pod as { ximalaya_plays?: number | null }).ximalaya_plays ?? null;
-    let dailyDelta: number | null = null;
-    if (xmPlays != null) {
-      const { data: prev } = await supabaseAdmin
-        .from("snapshots")
-        .select("ximalaya_plays,taken_at")
-        .eq("podcast_id", pod.id)
-        .not("ximalaya_plays", "is", null)
-        .order("taken_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (prev?.ximalaya_plays != null && prev.taken_at) {
-        const days = Math.max(
-          1,
-          (Date.now() - new Date(prev.taken_at).getTime()) / 86400000,
-        );
-        dailyDelta = Math.round(Math.max(0, xmPlays - prev.ximalaya_plays) / days);
+      const epRows = episodes.slice(0, 100).map((e) => ({
+        podcast_id: pod.id,
+        guid: e.guid || `${pod.id}:${e.title}`,
+        title: e.title,
+        description: e.description,
+        pub_date: e.pub_date,
+        duration_seconds: e.duration_seconds,
+        audio_url: e.audio_url,
+      }));
+      if (epRows.length) {
+        await supabaseAdmin
+          .from("episodes")
+          .upsert(epRows, { onConflict: "podcast_id,guid" });
       }
-    }
-    await supabaseAdmin.from("snapshots").insert({
-      podcast_id: pod.id,
-      episode_count: episodes.length,
-      estimated_reviews: Math.round(
-        episodes.length * 8 + scores.activity * 3 + scores.growth * 2,
-      ),
-      estimated_subscribers: Math.round(
-        episodes.length * 120 + scores.growth * 250 + scores.commercial * 80,
-      ),
-      xiaoyuzhou_subscribers: xySubs,
-      ximalaya_plays: xmPlays,
-      daily_play_delta: dailyDelta,
-    });
 
-    return { ok: true, podcastId: pod.id as string, source: rssFetch.source };
+      const xySubs = (pod as { xiaoyuzhou_subscribers?: number | null }).xiaoyuzhou_subscribers ?? null;
+      const xmPlays = (pod as { ximalaya_plays?: number | null }).ximalaya_plays ?? null;
+      let dailyDelta: number | null = null;
+      if (xmPlays != null) {
+        const { data: prev } = await supabaseAdmin
+          .from("snapshots")
+          .select("ximalaya_plays,taken_at")
+          .eq("podcast_id", pod.id)
+          .not("ximalaya_plays", "is", null)
+          .order("taken_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (prev?.ximalaya_plays != null && prev.taken_at) {
+          const days = Math.max(
+            1,
+            (Date.now() - new Date(prev.taken_at).getTime()) / 86400000,
+          );
+          dailyDelta = Math.round(Math.max(0, xmPlays - prev.ximalaya_plays) / days);
+        }
+      }
+      await supabaseAdmin.from("snapshots").insert({
+        podcast_id: pod.id,
+        episode_count: episodes.length,
+        estimated_reviews: Math.round(
+          episodes.length * 8 + scores.activity * 3 + scores.growth * 2,
+        ),
+        estimated_subscribers: Math.round(
+          episodes.length * 120 + scores.growth * 250 + scores.commercial * 80,
+        ),
+        xiaoyuzhou_subscribers: xySubs,
+        ximalaya_plays: xmPlays,
+        daily_play_delta: dailyDelta,
+      });
+
+      return { ok: true, podcastId: pod.id as string, source: rssFetch.source };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "播客导入失败，请稍后重试",
+        status: 500,
+        source: rssFetch.source,
+        blockedSource: false,
+        fallbackTried: rssFetch.source !== "direct",
+        podcastId: null,
+      };
+    }
   });
 
 export const listPodcasts = createServerFn({ method: "POST" })
