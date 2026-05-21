@@ -641,3 +641,30 @@ export const getPodcastDetail = createServerFn({ method: "GET" })
       snapshots: snapRes.data ?? [],
     };
   });
+
+export const updatePodcastMetrics = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        audience_persona: z.string().max(2000).nullable().optional(),
+        audience_age_range: z.string().max(200).nullable().optional(),
+        audience_gender_split: z.string().max(200).nullable().optional(),
+        audience_geo: z.string().max(500).nullable().optional(),
+        completion_rate: z.number().min(0).max(100).nullable().optional(),
+        new_listener_retention: z.number().min(0).max(100).nullable().optional(),
+        monthly_active_listeners: z.number().int().min(0).nullable().optional(),
+        cpm_rate: z.number().min(0).nullable().optional(),
+        metrics_notes: z.string().max(4000).nullable().optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { id, ...rest } = data;
+    const { error } = await supabaseAdmin
+      .from("podcasts")
+      .update({ ...rest, metrics_updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
