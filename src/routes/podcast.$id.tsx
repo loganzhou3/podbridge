@@ -9,6 +9,7 @@ import {
   BrandPanel,
   PlatformLinksPanel,
 } from "@/components/insights-panels";
+import { MetricsForm } from "@/components/metrics-form";
 import {
   Area,
   AreaChart,
