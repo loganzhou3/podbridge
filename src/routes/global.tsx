@@ -111,6 +111,9 @@ function GlobalDashboard() {
             示例：<code className="rounded bg-muted px-1.5 py-0.5">https://feeds.megaphone.fm/hubermanlab</code>
             · <code className="rounded bg-muted px-1.5 py-0.5">https://feeds.simplecast.com/54nAGcIl</code>（The Daily）
           </p>
+          <div className="my-4 border-t border-border" />
+          <div className="mb-2 text-sm font-medium">Bulk import</div>
+          <BulkIngestForm market="na" />
         </div>
 
         <div className="mb-6 flex flex-wrap gap-1.5">
