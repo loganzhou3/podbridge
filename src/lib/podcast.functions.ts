@@ -131,16 +131,25 @@ export const ingestPodcast = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const rssUrl = data.rssUrl;
     const market = data.market ?? "cn";
-    const res = await fetch(rssUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        Accept:
-          "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
-      },
-      redirect: "follow",
-    });
-    if (!res.ok) throw new Error(`无法获取 RSS（HTTP ${res.status}），该源可能限制了访问或链接已失效`);
+    const browserHeaders = {
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      Accept:
+        "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
+    };
+    const fetchRss = async (url: string) =>
+      fetch(url, { headers: browserHeaders, redirect: "follow" });
+    let res = await fetchRss(rssUrl);
+    // Fallback through a public CORS/IP proxy when the source blocks our server IP
+    if ([403, 429, 451, 503].includes(res.status)) {
+      const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`;
+      const retry = await fetchRss(proxied);
+      if (retry.ok) res = retry;
+    }
+    if (!res.ok)
+      throw new Error(
+        `无法获取 RSS（HTTP ${res.status}），该源可能限制了服务器访问或链接已失效，请换一个镜像/官方地址再试`,
+      );
     const xml = await res.text();
     const doc = parser.parse(xml);
     const channel = doc?.rss?.channel ?? doc?.feed;
