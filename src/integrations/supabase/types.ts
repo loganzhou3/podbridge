@@ -135,11 +135,17 @@ export type Database = {
           activity_score: number | null
           ai_strategy: Json | null
           ai_strategy_at: string | null
+          audience_age_range: string | null
+          audience_gender_split: string | null
+          audience_geo: string | null
+          audience_persona: string | null
           audience_tags: string[] | null
           author: string | null
           avg_duration_minutes: number | null
           category: string | null
           commercial_score: number | null
+          completion_rate: number | null
+          cpm_rate: number | null
           created_at: string
           description: string | null
           episode_count: number | null
@@ -154,6 +160,10 @@ export type Database = {
           latest_episode_at: string | null
           lifecycle_stage: string | null
           market: string
+          metrics_notes: string | null
+          metrics_updated_at: string | null
+          monthly_active_listeners: number | null
+          new_listener_retention: number | null
           rss_url: string
           title: string | null
           update_frequency_days: number | null
@@ -167,11 +177,17 @@ export type Database = {
           activity_score?: number | null
           ai_strategy?: Json | null
           ai_strategy_at?: string | null
+          audience_age_range?: string | null
+          audience_gender_split?: string | null
+          audience_geo?: string | null
+          audience_persona?: string | null
           audience_tags?: string[] | null
           author?: string | null
           avg_duration_minutes?: number | null
           category?: string | null
           commercial_score?: number | null
+          completion_rate?: number | null
+          cpm_rate?: number | null
           created_at?: string
           description?: string | null
           episode_count?: number | null
@@ -186,6 +202,10 @@ export type Database = {
           latest_episode_at?: string | null
           lifecycle_stage?: string | null
           market?: string
+          metrics_notes?: string | null
+          metrics_updated_at?: string | null
+          monthly_active_listeners?: number | null
+          new_listener_retention?: number | null
           rss_url: string
           title?: string | null
           update_frequency_days?: number | null
@@ -199,11 +219,17 @@ export type Database = {
           activity_score?: number | null
           ai_strategy?: Json | null
           ai_strategy_at?: string | null
+          audience_age_range?: string | null
+          audience_gender_split?: string | null
+          audience_geo?: string | null
+          audience_persona?: string | null
           audience_tags?: string[] | null
           author?: string | null
           avg_duration_minutes?: number | null
           category?: string | null
           commercial_score?: number | null
+          completion_rate?: number | null
+          cpm_rate?: number | null
           created_at?: string
           description?: string | null
           episode_count?: number | null
@@ -218,6 +244,10 @@ export type Database = {
           latest_episode_at?: string | null
           lifecycle_stage?: string | null
           market?: string
+          metrics_notes?: string | null
+          metrics_updated_at?: string | null
+          monthly_active_listeners?: number | null
+          new_listener_retention?: number | null
           rss_url?: string
           title?: string | null
           update_frequency_days?: number | null

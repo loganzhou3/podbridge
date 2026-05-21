@@ -9,6 +9,7 @@ import {
   BrandPanel,
   PlatformLinksPanel,
 } from "@/components/insights-panels";
+import { MetricsForm } from "@/components/metrics-form";
 import {
   Area,
   AreaChart,
@@ -247,6 +248,25 @@ function PodcastDetail() {
         {/* Brand recommendations */}
         <div className="mt-6">
           <BrandPanel podcastId={p.id} />
+        </div>
+
+        {/* Core metrics registration */}
+        <div className="mt-6">
+          <MetricsForm
+            podcastId={p.id}
+            initial={{
+              audience_persona: (p as any).audience_persona ?? null,
+              audience_age_range: (p as any).audience_age_range ?? null,
+              audience_gender_split: (p as any).audience_gender_split ?? null,
+              audience_geo: (p as any).audience_geo ?? null,
+              completion_rate: (p as any).completion_rate ?? null,
+              new_listener_retention: (p as any).new_listener_retention ?? null,
+              monthly_active_listeners: (p as any).monthly_active_listeners ?? null,
+              cpm_rate: (p as any).cpm_rate ?? null,
+              metrics_notes: (p as any).metrics_notes ?? null,
+              metrics_updated_at: (p as any).metrics_updated_at ?? null,
+            }}
+          />
         </div>
 
         {/* Charts */}
