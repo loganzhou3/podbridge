@@ -83,7 +83,17 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
     for (let i = 0; i < urls.length; i++) {
       const url = urls[i];
       try {
-        await ingest({ data: { rssUrl: url, market } });
+        const res = await ingest({ data: { rssUrl: url, market } });
+        if (res.ok === false) {
+          failCount++;
+          setResults((r) =>
+            r.map((x, idx) =>
+              idx === i ? { ...x, status: "fail", message: res.error } : x,
+            ),
+          );
+          setDone(i + 1);
+          continue;
+        }
         okCount++;
         setResults((r) =>
           r.map((x, idx) => (idx === i ? { ...x, status: "ok" } : x)),

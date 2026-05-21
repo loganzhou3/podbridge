@@ -32,6 +32,10 @@ export function RssIngestForm({
     setLoading(true);
     try {
       const res = await ingest({ data: { rssUrl: url.trim(), market } });
+      if (res.ok === false) {
+        toast.error(res.error);
+        return;
+      }
       toast.success(market === "na" ? "Analysis complete" : "分析完成");
       navigate({ to: "/podcast/$id", params: { id: res.podcastId } });
     } catch (err) {
