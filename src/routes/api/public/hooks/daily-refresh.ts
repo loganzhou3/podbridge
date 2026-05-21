@@ -36,6 +36,16 @@ export const Route = createFileRoute("/api/public/hooks/daily-refresh")({
                 market: (p.market === "na" ? "na" : "cn") as "cn" | "na",
               },
             });
+            const ingestResult = await ingestPodcast({
+              data: {
+                rssUrl: p.rss_url,
+                market: (p.market === "na" ? "na" : "cn") as "cn" | "na",
+              },
+            });
+            if (ingestResult.ok === false) {
+              results.push({ id: p.id, ok: false, scraped, error: ingestResult.error });
+              continue;
+            }
             results.push({ id: p.id, ok: true, scraped });
           } catch (e) {
             results.push({

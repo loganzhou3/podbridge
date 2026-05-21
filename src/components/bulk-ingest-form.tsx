@@ -84,7 +84,7 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
       const url = urls[i];
       try {
         const res = await ingest({ data: { rssUrl: url, market } });
-        if (!res.ok) {
+        if (res.ok === false) {
           failCount++;
           setResults((r) =>
             r.map((x, idx) =>

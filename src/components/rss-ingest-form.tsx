@@ -32,7 +32,7 @@ export function RssIngestForm({
     setLoading(true);
     try {
       const res = await ingest({ data: { rssUrl: url.trim(), market } });
-      if (!res.ok || !res.podcastId) {
+      if (res.ok === false) {
         toast.error(res.error);
         return;
       }
