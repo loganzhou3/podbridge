@@ -132,9 +132,15 @@ export const ingestPodcast = createServerFn({ method: "POST" })
     const rssUrl = data.rssUrl;
     const market = data.market ?? "cn";
     const res = await fetch(rssUrl, {
-      headers: { "User-Agent": "PodBridgeBot/1.0 (+https://podbridge.app)" },
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        Accept:
+          "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
+      },
+      redirect: "follow",
     });
-    if (!res.ok) throw new Error(`无法获取 RSS（HTTP ${res.status}）`);
+    if (!res.ok) throw new Error(`无法获取 RSS（HTTP ${res.status}），该源可能限制了访问或链接已失效`);
     const xml = await res.text();
     const doc = parser.parse(xml);
     const channel = doc?.rss?.channel ?? doc?.feed;
