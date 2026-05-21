@@ -4,6 +4,122 @@ import { XMLParser } from "fast-xml-parser";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
+const RSS_FETCH_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  Accept:
+    "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
+};
+const RSS_BLOCK_STATUSES = new Set([403, 429, 451, 503]);
+
+type IngestPodcastResult =
+  | { ok: true; podcastId: string; source: string }
+  | {
+      ok: false;
+      error: string;
+      status: number;
+      source: string;
+      blockedSource: boolean;
+      fallbackTried: boolean;
+      podcastId: null;
+    };
+
+async function fetchRssContent(rssUrl: string): Promise<
+  | { ok: true; xml: string; source: string }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+      source: string;
+      blockedSource: boolean;
+      fallbackTried: boolean;
+    }
+> {
+  const readText = async (res: Response) => {
+    try {
+      return await res.text();
+    } catch {
+      return "";
+    }
+  };
+
+  const attempts = [
+    { source: "direct", url: rssUrl, mode: "text" as const },
+    {
+      source: "allorigins-raw",
+      url: `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`,
+      mode: "text" as const,
+    },
+    {
+      source: "allorigins-get",
+      url: `https://api.allorigins.win/get?disableCache=true&url=${encodeURIComponent(rssUrl)}`,
+      mode: "allorigins" as const,
+    },
+    {
+      source: "codetabs",
+      url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(rssUrl)}`,
+      mode: "text" as const,
+    },
+  ];
+
+  let lastStatus = 0;
+  let lastError = "";
+  let lastSource = "direct";
+  let fallbackTried = false;
+
+  for (let i = 0; i < attempts.length; i++) {
+    const attempt = attempts[i];
+    const isFallback = i > 0;
+    if (isFallback) fallbackTried = true;
+    lastSource = attempt.source;
+
+    try {
+      const res = await fetch(attempt.url, {
+        headers: RSS_FETCH_HEADERS,
+        redirect: "follow",
+      });
+
+      lastStatus = res.status;
+      if (!res.ok) {
+        lastError = (await readText(res)).slice(0, 300) || res.statusText || "request failed";
+        if (!isFallback && !RSS_BLOCK_STATUSES.has(res.status)) {
+          break;
+        }
+        continue;
+      }
+
+      let xml = "";
+      if (attempt.mode === "allorigins") {
+        const payload = (await res.json().catch(() => null)) as
+          | { contents?: string; status?: { http_code?: number } }
+          | null;
+        xml = payload?.contents?.trim() ?? "";
+        if (!xml && payload?.status?.http_code) {
+          lastStatus = payload.status.http_code;
+        }
+      } else {
+        xml = (await res.text()).trim();
+      }
+
+      if (xml) {
+        return { ok: true, xml, source: attempt.source };
+      }
+
+      lastError = "empty response body";
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : "request failed";
+    }
+  }
+
+  return {
+    ok: false,
+    status: lastStatus || 500,
+    error: lastError || "无法获取 RSS",
+    source: lastSource,
+    blockedSource: RSS_BLOCK_STATUSES.has(lastStatus),
+    fallbackTried,
+  };
+}
 
 function asArray<T>(x: T | T[] | undefined): T[] {
   if (!x) return [];
@@ -128,29 +244,25 @@ export const ingestPodcast = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<IngestPodcastResult> => {
     const rssUrl = data.rssUrl;
     const market = data.market ?? "cn";
-    const browserHeaders = {
-      "User-Agent":
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      Accept:
-        "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.5",
-    };
-    const fetchRss = async (url: string) =>
-      fetch(url, { headers: browserHeaders, redirect: "follow" });
-    let res = await fetchRss(rssUrl);
-    // Fallback through a public CORS/IP proxy when the source blocks our server IP
-    if ([403, 429, 451, 503].includes(res.status)) {
-      const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`;
-      const retry = await fetchRss(proxied);
-      if (retry.ok) res = retry;
+    const rssFetch = await fetchRssContent(rssUrl);
+    if (!rssFetch.ok) {
+      return {
+        ok: false,
+        error: rssFetch.blockedSource
+          ? `无法获取 RSS（HTTP ${rssFetch.status}），该源可能限制了服务器访问；已尝试代理抓取但仍失败，请换一个镜像/官方地址再试`
+          : `无法获取 RSS（HTTP ${rssFetch.status}），链接可能已失效或返回了非 RSS 内容，请检查地址后重试`,
+        status: rssFetch.status,
+        source: rssFetch.source,
+        blockedSource: rssFetch.blockedSource,
+        fallbackTried: rssFetch.fallbackTried,
+        podcastId: null,
+      };
     }
-    if (!res.ok)
-      throw new Error(
-        `无法获取 RSS（HTTP ${res.status}），该源可能限制了服务器访问或链接已失效，请换一个镜像/官方地址再试`,
-      );
-    const xml = await res.text();
+
+    const xml = rssFetch.xml;
     const doc = parser.parse(xml);
     const channel = doc?.rss?.channel ?? doc?.feed;
     if (!channel) throw new Error("RSS 格式无法识别");
@@ -309,7 +421,7 @@ export const ingestPodcast = createServerFn({ method: "POST" })
       daily_play_delta: dailyDelta,
     });
 
-    return { podcastId: pod.id as string };
+    return { ok: true, podcastId: pod.id as string, source: rssFetch.source };
   });
 
 export const listPodcasts = createServerFn({ method: "POST" })
