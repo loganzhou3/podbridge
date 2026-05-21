@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { SiteHeader } from "@/components/site-header";
 import { RssIngestForm } from "@/components/rss-ingest-form";
+import { BulkIngestForm } from "@/components/bulk-ingest-form";
 import { listPodcasts } from "@/lib/podcast.functions";
 import { Badge } from "@/components/ui/badge";
 import { Activity, Clock, Tag, TrendingUp, Loader2, Globe2, Target } from "lucide-react";
@@ -110,6 +111,9 @@ function GlobalDashboard() {
             示例：<code className="rounded bg-muted px-1.5 py-0.5">https://feeds.megaphone.fm/hubermanlab</code>
             · <code className="rounded bg-muted px-1.5 py-0.5">https://feeds.simplecast.com/54nAGcIl</code>（The Daily）
           </p>
+          <div className="my-4 border-t border-border" />
+          <div className="mb-2 text-sm font-medium">Bulk import</div>
+          <BulkIngestForm market="na" />
         </div>
 
         <div className="mb-6 flex flex-wrap gap-1.5">
