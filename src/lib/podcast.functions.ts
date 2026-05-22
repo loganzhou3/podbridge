@@ -668,3 +668,63 @@ export const updatePodcastMetrics = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true as const };
   });
+
+// ============================================================
+// Search podcasts by name (uses Apple iTunes Search API)
+// ============================================================
+export const searchPodcasts = createServerFn({ method: "POST" })
+  .inputValidator((input) =>
+    z
+      .object({
+        query: z.string().min(1).max(200),
+        market: z.enum(["cn", "na"]).default("cn"),
+        limit: z.number().int().min(1).max(25).default(15),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const country = data.market === "na" ? "US" : "CN";
+    const url = `https://itunes.apple.com/search?media=podcast&country=${country}&limit=${data.limit}&term=${encodeURIComponent(
+      data.query,
+    )}`;
+    try {
+      const res = await fetch(url, { headers: { "User-Agent": RSS_FETCH_HEADERS["User-Agent"] } });
+      if (!res.ok) {
+        return { ok: false as const, error: `搜索失败（HTTP ${res.status}）`, results: [] };
+      }
+      const json = (await res.json()) as {
+        results?: Array<{
+          collectionId?: number;
+          trackId?: number;
+          collectionName?: string;
+          trackName?: string;
+          artistName?: string;
+          feedUrl?: string;
+          artworkUrl600?: string;
+          artworkUrl100?: string;
+          primaryGenreName?: string;
+          trackCount?: number;
+          releaseDate?: string;
+          country?: string;
+          collectionViewUrl?: string;
+        }>;
+      };
+      const results = (json.results ?? [])
+        .filter((r) => !!r.feedUrl)
+        .map((r) => ({
+          id: String(r.collectionId ?? r.trackId ?? r.feedUrl),
+          title: r.collectionName ?? r.trackName ?? "Unknown",
+          author: r.artistName ?? "",
+          feedUrl: r.feedUrl as string,
+          artwork: r.artworkUrl600 ?? r.artworkUrl100 ?? null,
+          genre: r.primaryGenreName ?? null,
+          trackCount: r.trackCount ?? null,
+          releaseDate: r.releaseDate ?? null,
+          itunesUrl: r.collectionViewUrl ?? null,
+        }));
+      return { ok: true as const, results };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { ok: false as const, error: `搜索出错：${msg}`, results: [] };
+    }
+  });
