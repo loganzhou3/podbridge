@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { SiteHeader } from "@/components/site-header";
 import { RssIngestForm } from "@/components/rss-ingest-form";
 import { BulkIngestForm } from "@/components/bulk-ingest-form";
+import { PodcastSearchForm } from "@/components/podcast-search-form";
 import { listPodcasts, listBrandCategories } from "@/lib/podcast.functions";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -107,7 +108,13 @@ function DashboardPage() {
           className="mb-6 rounded-xl border border-border bg-card p-4"
           style={{ boxShadow: "var(--shadow-card)" }}
         >
-          <div className="mb-3 text-sm font-medium">添加新播客分析</div>
+          <div className="mb-3 text-sm font-medium">按名称搜索播客（推荐）</div>
+          <PodcastSearchForm market="cn" />
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            直接输入中文播客名称即可，无需 RSS 链接。数据源自 Apple Podcasts。
+          </p>
+          <div className="my-4 border-t border-border" />
+          <div className="mb-3 text-sm font-medium">或粘贴 RSS 链接</div>
           <RssIngestForm />
           <div className="my-4 border-t border-border" />
           <div className="mb-3 text-sm font-medium">批量导入</div>
