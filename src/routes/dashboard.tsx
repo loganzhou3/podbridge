@@ -239,6 +239,69 @@ function DashboardPage() {
           )}
         </div>
 
+        <div
+          className="mb-8 rounded-xl border border-border bg-card p-4"
+          style={{ boxShadow: "var(--shadow-card)" }}
+        >
+          <div className="mb-3 flex items-center gap-2 text-sm font-medium">
+            <Folder className="h-4 w-4 text-primary" />
+            播客分类
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => setPodcastCategory("")}
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                podcastCategory === ""
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              全部分类
+              <span className="ml-1 opacity-60">{allPodcasts.length}</span>
+            </button>
+            {podcastCategories.map((c) => (
+              <button
+                key={c.name}
+                onClick={() =>
+                  setPodcastCategory(c.name === podcastCategory ? "" : c.name)
+                }
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  podcastCategory === c.name
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {c.name}
+                <span className="ml-1 opacity-60">{c.count}</span>
+              </button>
+            ))}
+            {podcastCategories.length === 0 && (
+              <span className="text-xs text-muted-foreground">暂无分类数据</span>
+            )}
+          </div>
+
+          <div className="mt-4 mb-3 flex items-center gap-2 text-sm font-medium">
+            <Users className="h-4 w-4 text-primary" />
+            订阅数分级
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {SUB_TIERS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setSubTier(t.id)}
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  subTier === t.id
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {t.label}
+                <span className="ml-1 opacity-60">{tierCounts[t.id]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {isLoading && (
           <div className="grid place-items-center py-20 text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
