@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -10,7 +10,18 @@ import { listPodcasts, listBrandCategories } from "@/lib/podcast.functions";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Activity, Clock, Tag, TrendingUp, Loader2, Search, X } from "lucide-react";
+import { Activity, Clock, Tag, TrendingUp, Loader2, Search, X, Folder, Users } from "lucide-react";
+
+type SubTier = "all" | "lt1k" | "1k-1w" | "1w-10w" | "gt10w" | "unknown";
+
+const SUB_TIERS: { id: SubTier; label: string; test: (n: number | null) => boolean }[] = [
+  { id: "all", label: "全部订阅量", test: () => true },
+  { id: "gt10w", label: "10万+", test: (n) => n != null && n >= 100000 },
+  { id: "1w-10w", label: "1万 – 10万", test: (n) => n != null && n >= 10000 && n < 100000 },
+  { id: "1k-1w", label: "1千 – 1万", test: (n) => n != null && n >= 1000 && n < 10000 },
+  { id: "lt1k", label: "< 1千", test: (n) => n != null && n < 1000 },
+  { id: "unknown", label: "未知", test: (n) => n == null },
+];
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
