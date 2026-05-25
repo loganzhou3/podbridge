@@ -68,6 +68,8 @@ function DashboardPage() {
   const [brandInput, setBrandInput] = useState("");
   const [brand, setBrand] = useState("");
   const [category, setCategory] = useState("");
+  const [podcastCategory, setPodcastCategory] = useState<string>("");
+  const [subTier, setSubTier] = useState<SubTier>("all");
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["podcasts", brand, category],
@@ -85,15 +87,62 @@ function DashboardPage() {
     queryFn: () => listCats(),
   });
 
-  const podcasts = data?.podcasts ?? [];
+  const allPodcasts = data?.podcasts ?? [];
   const cats = catData?.categories ?? [];
-  const hasFilter = !!(brand || category);
+
+  // Derive podcast-category facets (with counts) from the loaded list
+  const podcastCategories = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of allPodcasts) {
+      const c = (p.category ?? "").trim();
+      if (!c) continue;
+      map.set(c, (map.get(c) ?? 0) + 1);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+  }, [allPodcasts]);
+
+  // Derive subscriber-tier counts from the loaded list
+  const tierCounts = useMemo(() => {
+    const counts: Record<SubTier, number> = {
+      all: allPodcasts.length,
+      gt10w: 0,
+      "1w-10w": 0,
+      "1k-1w": 0,
+      lt1k: 0,
+      unknown: 0,
+    };
+    for (const p of allPodcasts) {
+      const n = (p as { xiaoyuzhou_subscribers?: number | null }).xiaoyuzhou_subscribers ?? null;
+      for (const t of SUB_TIERS) {
+        if (t.id !== "all" && t.test(n)) counts[t.id]++;
+      }
+    }
+    return counts;
+  }, [allPodcasts]);
+
+  const tier = SUB_TIERS.find((t) => t.id === subTier)!;
+  const podcasts = useMemo(
+    () =>
+      allPodcasts.filter((p) => {
+        if (podcastCategory && (p.category ?? "").trim() !== podcastCategory) return false;
+        const n = (p as { xiaoyuzhou_subscribers?: number | null }).xiaoyuzhou_subscribers ?? null;
+        if (!tier.test(n)) return false;
+        return true;
+      }),
+    [allPodcasts, podcastCategory, tier],
+  );
+
+  const hasFilter = !!(brand || category || podcastCategory || subTier !== "all");
 
   const applyBrand = () => setBrand(brandInput.trim());
   const clearFilters = () => {
     setBrand("");
     setBrandInput("");
     setCategory("");
+    setPodcastCategory("");
+    setSubTier("all");
   };
 
   return (
