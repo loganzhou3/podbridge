@@ -578,20 +578,27 @@ export const listPodcasts = createServerFn({ method: "POST" })
       if (podcastIds.length === 0) return { podcasts: [] };
     }
 
-    let q = supabaseAdmin
-      .from("podcasts")
-      .select(
-        "id,title,author,image_url,category,episode_count,latest_episode_at,update_frequency_days,commercial_score,activity_score,growth_score,lifecycle_stage,audience_tags,market,xiaoyuzhou_subscribers,ximalaya_plays",
-      )
-      .eq("market", market)
-      .order("commercial_score", { ascending: false })
-      .limit(100000);
-    if (podcastIds) q = q.in("id", podcastIds);
-    if (category) q = q.ilike("category", `%${category}%`);
-
-    const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
-    return { podcasts: rows ?? [] };
+    const MAX_TOTAL = 100000;
+    const PAGE = 1000;
+    const all: any[] = [];
+    for (let from = 0; from < MAX_TOTAL; from += PAGE) {
+      let q = supabaseAdmin
+        .from("podcasts")
+        .select(
+          "id,title,author,image_url,category,episode_count,latest_episode_at,update_frequency_days,commercial_score,activity_score,growth_score,lifecycle_stage,audience_tags,market,xiaoyuzhou_subscribers,ximalaya_plays",
+        )
+        .eq("market", market)
+        .order("commercial_score", { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (podcastIds) q = q.in("id", podcastIds);
+      if (category) q = q.ilike("category", `%${category}%`);
+      const { data: rows, error } = await q;
+      if (error) throw new Error(error.message);
+      if (!rows || rows.length === 0) break;
+      all.push(...rows);
+      if (rows.length < PAGE) break;
+    }
+    return { podcasts: all };
   });
 
 export const listBrandCategories = createServerFn({ method: "GET" }).handler(
