@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -10,7 +10,18 @@ import { listPodcasts, listBrandCategories } from "@/lib/podcast.functions";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Activity, Clock, Tag, TrendingUp, Loader2, Search, X } from "lucide-react";
+import { Activity, Clock, Tag, TrendingUp, Loader2, Search, X, Folder, Users } from "lucide-react";
+
+type SubTier = "all" | "lt1k" | "1k-1w" | "1w-10w" | "gt10w" | "unknown";
+
+const SUB_TIERS: { id: SubTier; label: string; test: (n: number | null) => boolean }[] = [
+  { id: "all", label: "全部订阅量", test: () => true },
+  { id: "gt10w", label: "10万+", test: (n) => n != null && n >= 100000 },
+  { id: "1w-10w", label: "1万 – 10万", test: (n) => n != null && n >= 10000 && n < 100000 },
+  { id: "1k-1w", label: "1千 – 1万", test: (n) => n != null && n >= 1000 && n < 10000 },
+  { id: "lt1k", label: "< 1千", test: (n) => n != null && n < 1000 },
+  { id: "unknown", label: "未知", test: (n) => n == null },
+];
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -57,6 +68,8 @@ function DashboardPage() {
   const [brandInput, setBrandInput] = useState("");
   const [brand, setBrand] = useState("");
   const [category, setCategory] = useState("");
+  const [podcastCategory, setPodcastCategory] = useState<string>("");
+  const [subTier, setSubTier] = useState<SubTier>("all");
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["podcasts", brand, category],
@@ -74,15 +87,62 @@ function DashboardPage() {
     queryFn: () => listCats(),
   });
 
-  const podcasts = data?.podcasts ?? [];
+  const allPodcasts = data?.podcasts ?? [];
   const cats = catData?.categories ?? [];
-  const hasFilter = !!(brand || category);
+
+  // Derive podcast-category facets (with counts) from the loaded list
+  const podcastCategories = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of allPodcasts) {
+      const c = (p.category ?? "").trim();
+      if (!c) continue;
+      map.set(c, (map.get(c) ?? 0) + 1);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+  }, [allPodcasts]);
+
+  // Derive subscriber-tier counts from the loaded list
+  const tierCounts = useMemo(() => {
+    const counts: Record<SubTier, number> = {
+      all: allPodcasts.length,
+      gt10w: 0,
+      "1w-10w": 0,
+      "1k-1w": 0,
+      lt1k: 0,
+      unknown: 0,
+    };
+    for (const p of allPodcasts) {
+      const n = (p as { xiaoyuzhou_subscribers?: number | null }).xiaoyuzhou_subscribers ?? null;
+      for (const t of SUB_TIERS) {
+        if (t.id !== "all" && t.test(n)) counts[t.id]++;
+      }
+    }
+    return counts;
+  }, [allPodcasts]);
+
+  const tier = SUB_TIERS.find((t) => t.id === subTier)!;
+  const podcasts = useMemo(
+    () =>
+      allPodcasts.filter((p) => {
+        if (podcastCategory && (p.category ?? "").trim() !== podcastCategory) return false;
+        const n = (p as { xiaoyuzhou_subscribers?: number | null }).xiaoyuzhou_subscribers ?? null;
+        if (!tier.test(n)) return false;
+        return true;
+      }),
+    [allPodcasts, podcastCategory, tier],
+  );
+
+  const hasFilter = !!(brand || category || podcastCategory || subTier !== "all");
 
   const applyBrand = () => setBrand(brandInput.trim());
   const clearFilters = () => {
     setBrand("");
     setBrandInput("");
     setCategory("");
+    setPodcastCategory("");
+    setSubTier("all");
   };
 
   return (
@@ -177,6 +237,69 @@ function DashboardPage() {
               ))}
             </div>
           )}
+        </div>
+
+        <div
+          className="mb-8 rounded-xl border border-border bg-card p-4"
+          style={{ boxShadow: "var(--shadow-card)" }}
+        >
+          <div className="mb-3 flex items-center gap-2 text-sm font-medium">
+            <Folder className="h-4 w-4 text-primary" />
+            播客分类
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => setPodcastCategory("")}
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                podcastCategory === ""
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              全部分类
+              <span className="ml-1 opacity-60">{allPodcasts.length}</span>
+            </button>
+            {podcastCategories.map((c) => (
+              <button
+                key={c.name}
+                onClick={() =>
+                  setPodcastCategory(c.name === podcastCategory ? "" : c.name)
+                }
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  podcastCategory === c.name
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {c.name}
+                <span className="ml-1 opacity-60">{c.count}</span>
+              </button>
+            ))}
+            {podcastCategories.length === 0 && (
+              <span className="text-xs text-muted-foreground">暂无分类数据</span>
+            )}
+          </div>
+
+          <div className="mt-4 mb-3 flex items-center gap-2 text-sm font-medium">
+            <Users className="h-4 w-4 text-primary" />
+            订阅数分级
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {SUB_TIERS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setSubTier(t.id)}
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  subTier === t.id
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-muted/30 text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {t.label}
+                <span className="ml-1 opacity-60">{tierCounts[t.id]}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {isLoading && (
