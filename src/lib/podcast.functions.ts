@@ -585,7 +585,7 @@ export const listPodcasts = createServerFn({ method: "POST" })
       )
       .eq("market", market)
       .order("commercial_score", { ascending: false })
-      .limit(100);
+      .limit(100000);
     if (podcastIds) q = q.in("id", podcastIds);
     if (category) q = q.ilike("category", `%${category}%`);
 
