@@ -275,7 +275,7 @@ export const ingestFromPlatformUrl = createServerFn({ method: "POST" })
       }
 
       const conflictCol = kind === "xyz" ? "xiaoyuzhou_url" : "ximalaya_url";
-      const row: Record<string, unknown> = {
+      const baseRow = {
         title: s.title,
         author: s.author,
         description: (s.description ?? "").slice(0, 2000),
@@ -289,17 +289,22 @@ export const ingestFromPlatformUrl = createServerFn({ method: "POST" })
         growth_score: 50,
         lifecycle_stage: "成长期",
       };
-      if (kind === "xyz") {
-        row.xiaoyuzhou_url = data.url;
-        row.xiaoyuzhou_subscribers = s.subs;
-        row.xiaoyuzhou_comments = s.comments;
-        row.xiaoyuzhou_episode_count = s.episodeCount;
-      } else {
-        row.ximalaya_url = data.url;
-        row.ximalaya_plays = s.plays;
-        row.ximalaya_subscribers = s.subs;
-        row.ximalaya_comments = s.comments;
-      }
+      const row =
+        kind === "xyz"
+          ? {
+              ...baseRow,
+              xiaoyuzhou_url: data.url,
+              xiaoyuzhou_subscribers: s.subs,
+              xiaoyuzhou_comments: s.comments,
+              xiaoyuzhou_episode_count: s.episodeCount,
+            }
+          : {
+              ...baseRow,
+              ximalaya_url: data.url,
+              ximalaya_plays: s.plays,
+              ximalaya_subscribers: s.subs,
+              ximalaya_comments: s.comments,
+            };
 
       const { data: pod, error } = await supabaseAdmin
         .from("podcasts")
