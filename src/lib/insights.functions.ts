@@ -181,7 +181,16 @@ export const scrapePodcastPlatforms = createServerFn({ method: "POST" })
       throw new Error("请先填写小宇宙 / 喜马拉雅 / Apple 链接");
     }
 
-    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    const updates: {
+      updated_at: string;
+      xiaoyuzhou_subscribers?: number | null;
+      xiaoyuzhou_comments?: number | null;
+      xiaoyuzhou_episode_count?: number | null;
+      ximalaya_plays?: number | null;
+      ximalaya_subscribers?: number | null;
+      ximalaya_comments?: number | null;
+      apple_reviews?: number | null;
+    } = { updated_at: new Date().toISOString() };
 
     if (pod.xiaoyuzhou_url) {
       try {
@@ -226,7 +235,7 @@ export const scrapePodcastPlatforms = createServerFn({ method: "POST" })
       .update(updates)
       .eq("id", data.podcastId);
     if (upErr) throw new Error(upErr.message);
-    return { ok: true, updates };
+    return { ok: true as const };
   });
 
 // ---------- Ingest directly from Xiaoyuzhou / Ximalaya homepage URL ----------
