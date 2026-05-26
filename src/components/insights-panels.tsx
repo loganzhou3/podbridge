@@ -294,14 +294,24 @@ export function PlatformLinksPanel({
   podcastId,
   xiaoyuzhouUrl,
   ximalayaUrl,
+  itunesUrl,
   xiaoyuzhouSubs,
+  xiaoyuzhouComments,
   ximalayaPlays,
+  ximalayaSubs,
+  ximalayaComments,
+  appleReviews,
 }: {
   podcastId: string;
   xiaoyuzhouUrl: string | null;
   ximalayaUrl: string | null;
+  itunesUrl: string | null;
   xiaoyuzhouSubs: number | null;
+  xiaoyuzhouComments: number | null;
   ximalayaPlays: number | null;
+  ximalayaSubs: number | null;
+  ximalayaComments: number | null;
+  appleReviews: number | null;
 }) {
   const update = useServerFn(updatePodcastPlatforms);
   const scrape = useServerFn(scrapePodcastPlatforms);
@@ -357,7 +367,7 @@ export function PlatformLinksPanel({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Link2 className="h-4 w-4 text-primary" />
-          平台数据（小宇宙 / 喜马拉雅）
+          多平台数据（小宇宙 · 喜马拉雅 · Apple Podcasts）
         </div>
         <Button size="sm" variant="outline" onClick={onScrape} disabled={scraping}>
           {scraping ? (
@@ -368,6 +378,79 @@ export function PlatformLinksPanel({
           抓取最新数据
         </Button>
       </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="rounded-lg border border-border p-3">
+          <div className="text-xs font-medium text-muted-foreground">小宇宙</div>
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <div className="text-muted-foreground">订阅数</div>
+              <div className="font-semibold text-foreground">{fmt(xiaoyuzhouSubs)}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground">评论数</div>
+              <div className="font-semibold text-foreground">{fmt(xiaoyuzhouComments)}</div>
+            </div>
+          </div>
+          {xiaoyuzhouUrl && (
+            <a
+              href={xiaoyuzhouUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-block truncate text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              {xiaoyuzhouUrl}
+            </a>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-border p-3">
+          <div className="text-xs font-medium text-muted-foreground">喜马拉雅</div>
+          <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+            <div>
+              <div className="text-muted-foreground">订阅</div>
+              <div className="font-semibold text-foreground">{fmt(ximalayaSubs)}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground">播放</div>
+              <div className="font-semibold text-foreground">{fmt(ximalayaPlays)}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground">评论</div>
+              <div className="font-semibold text-foreground">{fmt(ximalayaComments)}</div>
+            </div>
+          </div>
+          {ximalayaUrl && (
+            <a
+              href={ximalayaUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-block truncate text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              {ximalayaUrl}
+            </a>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-border p-3">
+          <div className="text-xs font-medium text-muted-foreground">Apple Podcasts</div>
+          <div className="mt-2 text-xs">
+            <div className="text-muted-foreground">评论数</div>
+            <div className="font-semibold text-foreground">{fmt(appleReviews)}</div>
+          </div>
+          {itunesUrl && (
+            <a
+              href={itunesUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-block truncate text-[10px] text-muted-foreground hover:text-foreground"
+            >
+              {itunesUrl}
+            </a>
+          )}
+        </div>
+      </div>
+
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <div>
           <label className="text-xs text-muted-foreground">小宇宙链接</label>
@@ -377,9 +460,6 @@ export function PlatformLinksPanel({
             placeholder="https://www.xiaoyuzhoufm.com/podcast/..."
             className="mt-1"
           />
-          <div className="mt-2 text-xs text-muted-foreground">
-            订阅数：<span className="font-medium text-foreground">{fmt(xiaoyuzhouSubs)}</span>
-          </div>
         </div>
         <div>
           <label className="text-xs text-muted-foreground">喜马拉雅链接</label>
@@ -389,9 +469,6 @@ export function PlatformLinksPanel({
             placeholder="https://www.ximalaya.com/album/..."
             className="mt-1"
           />
-          <div className="mt-2 text-xs text-muted-foreground">
-            总播放：<span className="font-medium text-foreground">{fmt(ximalayaPlays)}</span>
-          </div>
         </div>
       </div>
       <Button size="sm" className="mt-3" onClick={onSave} disabled={saving}>
