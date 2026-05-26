@@ -308,7 +308,7 @@ export const ingestFromPlatformUrl = createServerFn({ method: "POST" })
 
       const { data: pod, error } = await supabaseAdmin
         .from("podcasts")
-        .upsert(row, { onConflict: conflictCol })
+        .upsert(row as never, { onConflict: conflictCol })
         .select("id")
         .single();
       if (error) throw new Error(error.message);
