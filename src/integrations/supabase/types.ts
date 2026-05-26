@@ -135,6 +135,8 @@ export type Database = {
           activity_score: number | null
           ai_strategy: Json | null
           ai_strategy_at: string | null
+          apple_reviews: number | null
+          apple_subscribers: number | null
           audience_age_range: string | null
           audience_gender_split: string | null
           audience_geo: string | null
@@ -164,19 +166,25 @@ export type Database = {
           metrics_updated_at: string | null
           monthly_active_listeners: number | null
           new_listener_retention: number | null
-          rss_url: string
+          rss_url: string | null
           title: string | null
           update_frequency_days: number | null
           updated_at: string
+          xiaoyuzhou_comments: number | null
+          xiaoyuzhou_episode_count: number | null
           xiaoyuzhou_subscribers: number | null
           xiaoyuzhou_url: string | null
+          ximalaya_comments: number | null
           ximalaya_plays: number | null
+          ximalaya_subscribers: number | null
           ximalaya_url: string | null
         }
         Insert: {
           activity_score?: number | null
           ai_strategy?: Json | null
           ai_strategy_at?: string | null
+          apple_reviews?: number | null
+          apple_subscribers?: number | null
           audience_age_range?: string | null
           audience_gender_split?: string | null
           audience_geo?: string | null
@@ -206,19 +214,25 @@ export type Database = {
           metrics_updated_at?: string | null
           monthly_active_listeners?: number | null
           new_listener_retention?: number | null
-          rss_url: string
+          rss_url?: string | null
           title?: string | null
           update_frequency_days?: number | null
           updated_at?: string
+          xiaoyuzhou_comments?: number | null
+          xiaoyuzhou_episode_count?: number | null
           xiaoyuzhou_subscribers?: number | null
           xiaoyuzhou_url?: string | null
+          ximalaya_comments?: number | null
           ximalaya_plays?: number | null
+          ximalaya_subscribers?: number | null
           ximalaya_url?: string | null
         }
         Update: {
           activity_score?: number | null
           ai_strategy?: Json | null
           ai_strategy_at?: string | null
+          apple_reviews?: number | null
+          apple_subscribers?: number | null
           audience_age_range?: string | null
           audience_gender_split?: string | null
           audience_geo?: string | null
@@ -248,13 +262,17 @@ export type Database = {
           metrics_updated_at?: string | null
           monthly_active_listeners?: number | null
           new_listener_retention?: number | null
-          rss_url?: string
+          rss_url?: string | null
           title?: string | null
           update_frequency_days?: number | null
           updated_at?: string
+          xiaoyuzhou_comments?: number | null
+          xiaoyuzhou_episode_count?: number | null
           xiaoyuzhou_subscribers?: number | null
           xiaoyuzhou_url?: string | null
+          ximalaya_comments?: number | null
           ximalaya_plays?: number | null
+          ximalaya_subscribers?: number | null
           ximalaya_url?: string | null
         }
         Relationships: []
