@@ -96,6 +96,76 @@ function extractNumber(text: string, patterns: RegExp[]): number | null {
   return null;
 }
 
+const XYZ_SUBS_PATTERNS = [
+  /([\d.,]+\s*[万亿]?)\s*(?:订阅|关注者?)/,
+  /(?:订阅|关注)\s*[:：]?\s*([\d.,]+\s*[万亿]?)/,
+];
+const XYZ_EPISODE_PATTERNS = [/([\d.,]+\s*[万亿]?)\s*(?:期|集)/];
+const XYZ_COMMENTS_PATTERNS = [/([\d.,]+\s*[万亿]?)\s*(?:条?评论|留言)/];
+const XMLY_PLAYS_PATTERNS = [
+  /([\d.,]+\s*[万亿]?)\s*(?:播放|次播放)/,
+  /(?:播放量|总播放)\s*[:：]?\s*([\d.,]+\s*[万亿]?)/,
+];
+const XMLY_SUBS_PATTERNS = [/([\d.,]+\s*[万亿]?)\s*(?:订阅|订阅者)/];
+const XMLY_COMMENTS_PATTERNS = [/([\d.,]+\s*[万亿]?)\s*(?:条?评论|留言)/];
+
+type PlatformScrape = {
+  title: string | null;
+  author: string | null;
+  description: string | null;
+  image: string | null;
+  subs: number | null;
+  comments: number | null;
+  episodeCount: number | null;
+  plays: number | null;
+};
+
+async function scrapePlatformUrl(url: string, kind: "xyz" | "xmly"): Promise<PlatformScrape> {
+  const fc = getFirecrawl();
+  const r = (await fc.scrape(url, {
+    formats: ["markdown"],
+    onlyMainContent: false,
+  })) as {
+    markdown?: string;
+    metadata?: { title?: string; description?: string; ogImage?: string; author?: string };
+  };
+  const md = r.markdown ?? "";
+  const meta = r.metadata ?? {};
+  const imgMatch = md.match(/!\[[^\]]*\]\((https?:[^)\s]+)\)/);
+  const image = imgMatch?.[1] ?? meta.ogImage ?? null;
+  let title = meta.title ?? null;
+  if (title) {
+    title = title
+      .replace(/[\|\-–—]\s*(小宇宙|喜马拉雅|xiaoyuzhou|Ximalaya).*$/i, "")
+      .trim();
+  }
+  const description = meta.description ?? null;
+  const author = meta.author ?? null;
+
+  if (kind === "xyz") {
+    return {
+      title,
+      author,
+      description,
+      image,
+      subs: extractNumber(md, XYZ_SUBS_PATTERNS),
+      comments: extractNumber(md, XYZ_COMMENTS_PATTERNS),
+      episodeCount: extractNumber(md, XYZ_EPISODE_PATTERNS),
+      plays: null,
+    };
+  }
+  return {
+    title,
+    author,
+    description,
+    image,
+    subs: extractNumber(md, XMLY_SUBS_PATTERNS),
+    comments: extractNumber(md, XMLY_COMMENTS_PATTERNS),
+    episodeCount: extractNumber(md, XYZ_EPISODE_PATTERNS),
+    plays: extractNumber(md, XMLY_PLAYS_PATTERNS),
+  };
+}
+
 export const scrapePodcastPlatforms = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z.object({ podcastId: z.string().uuid() }).parse(input),
@@ -103,29 +173,31 @@ export const scrapePodcastPlatforms = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { data: pod, error } = await supabaseAdmin
       .from("podcasts")
-      .select("id,xiaoyuzhou_url,ximalaya_url")
+      .select("id,xiaoyuzhou_url,ximalaya_url,itunes_id")
       .eq("id", data.podcastId)
       .single();
     if (error || !pod) throw new Error("播客不存在");
-    if (!pod.xiaoyuzhou_url && !pod.ximalaya_url) {
-      throw new Error("请先填写小宇宙或喜马拉雅链接");
+    if (!pod.xiaoyuzhou_url && !pod.ximalaya_url && !pod.itunes_id) {
+      throw new Error("请先填写小宇宙 / 喜马拉雅 / Apple 链接");
     }
 
-    const fc = getFirecrawl();
-    let xiaoyuzhouSubs: number | null = null;
-    let ximalayaPlays: number | null = null;
+    const updates: {
+      updated_at: string;
+      xiaoyuzhou_subscribers?: number | null;
+      xiaoyuzhou_comments?: number | null;
+      xiaoyuzhou_episode_count?: number | null;
+      ximalaya_plays?: number | null;
+      ximalaya_subscribers?: number | null;
+      ximalaya_comments?: number | null;
+      apple_reviews?: number | null;
+    } = { updated_at: new Date().toISOString() };
 
     if (pod.xiaoyuzhou_url) {
       try {
-        const r = await fc.scrape(pod.xiaoyuzhou_url, {
-          formats: ["markdown"],
-          onlyMainContent: true,
-        });
-        const md = (r as { markdown?: string }).markdown ?? "";
-        xiaoyuzhouSubs = extractNumber(md, [
-          /([\d.,]+\s*[万亿]?)\s*(?:订阅|关注)/,
-          /(?:订阅|关注)\s*[:：]?\s*([\d.,]+\s*[万亿]?)/,
-        ]);
+        const s = await scrapePlatformUrl(pod.xiaoyuzhou_url, "xyz");
+        updates.xiaoyuzhou_subscribers = s.subs;
+        updates.xiaoyuzhou_comments = s.comments;
+        updates.xiaoyuzhou_episode_count = s.episodeCount;
       } catch (e) {
         console.error("xiaoyuzhou scrape failed", e);
       }
@@ -133,30 +205,226 @@ export const scrapePodcastPlatforms = createServerFn({ method: "POST" })
 
     if (pod.ximalaya_url) {
       try {
-        const r = await fc.scrape(pod.ximalaya_url, {
-          formats: ["markdown"],
-          onlyMainContent: true,
-        });
-        const md = (r as { markdown?: string }).markdown ?? "";
-        ximalayaPlays = extractNumber(md, [
-          /([\d.,]+\s*[万亿]?)\s*(?:播放|次播放)/,
-          /(?:播放量|总播放)\s*[:：]?\s*([\d.,]+\s*[万亿]?)/,
-        ]);
+        const s = await scrapePlatformUrl(pod.ximalaya_url, "xmly");
+        updates.ximalaya_plays = s.plays;
+        updates.ximalaya_subscribers = s.subs;
+        updates.ximalaya_comments = s.comments;
       } catch (e) {
         console.error("ximalaya scrape failed", e);
       }
     }
 
+    if (pod.itunes_id) {
+      try {
+        const rssUrl = `https://itunes.apple.com/cn/rss/customerreviews/id=${pod.itunes_id}/json`;
+        const r = await fetch(rssUrl);
+        if (r.ok) {
+          const j = (await r.json()) as { feed?: { entry?: unknown[] } };
+          const entries = j.feed?.entry;
+          if (Array.isArray(entries)) {
+            updates.apple_reviews = Math.max(0, entries.length - 1);
+          }
+        }
+      } catch (e) {
+        console.error("apple reviews fetch failed", e);
+      }
+    }
+
     const { error: upErr } = await supabaseAdmin
       .from("podcasts")
-      .update({
-        xiaoyuzhou_subscribers: xiaoyuzhouSubs,
-        ximalaya_plays: ximalayaPlays,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updates)
       .eq("id", data.podcastId);
     if (upErr) throw new Error(upErr.message);
-    return { ok: true, xiaoyuzhouSubs, ximalayaPlays };
+    return { ok: true as const };
+  });
+
+// ---------- Ingest directly from Xiaoyuzhou / Ximalaya homepage URL ----------
+function detectPlatform(url: string): "xyz" | "xmly" | null {
+  if (/xiaoyuzhoufm\.com\/podcast/i.test(url)) return "xyz";
+  if (/ximalaya\.com\/(album|podcast)/i.test(url)) return "xmly";
+  return null;
+}
+
+export const ingestFromPlatformUrl = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        url: z.string().url().max(2048),
+        market: z.enum(["cn", "na"]).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const kind = detectPlatform(data.url);
+    if (!kind) {
+      return {
+        ok: false as const,
+        error:
+          "仅支持小宇宙 (xiaoyuzhoufm.com/podcast/...) 或喜马拉雅 (ximalaya.com/album/...) 链接",
+        podcastId: null,
+      };
+    }
+    try {
+      const s = await scrapePlatformUrl(data.url, kind);
+      if (!s.title) {
+        return {
+          ok: false as const,
+          error: "无法识别播客标题，请检查链接",
+          podcastId: null,
+        };
+      }
+
+      const conflictCol = kind === "xyz" ? "xiaoyuzhou_url" : "ximalaya_url";
+      const baseRow = {
+        title: s.title,
+        author: s.author,
+        description: (s.description ?? "").slice(0, 2000),
+        image_url: s.image,
+        market: data.market ?? "cn",
+        last_synced_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        episode_count: s.episodeCount ?? 0,
+        commercial_score: 50,
+        activity_score: 50,
+        growth_score: 50,
+        lifecycle_stage: "成长期",
+      };
+      const row =
+        kind === "xyz"
+          ? {
+              ...baseRow,
+              xiaoyuzhou_url: data.url,
+              xiaoyuzhou_subscribers: s.subs,
+              xiaoyuzhou_comments: s.comments,
+              xiaoyuzhou_episode_count: s.episodeCount,
+            }
+          : {
+              ...baseRow,
+              ximalaya_url: data.url,
+              ximalaya_plays: s.plays,
+              ximalaya_subscribers: s.subs,
+              ximalaya_comments: s.comments,
+            };
+
+      const { data: pod, error } = await supabaseAdmin
+        .from("podcasts")
+        .upsert(row as never, { onConflict: conflictCol })
+        .select("id")
+        .single();
+      if (error) throw new Error(error.message);
+
+      await supabaseAdmin.from("snapshots").insert({
+        podcast_id: pod.id,
+        episode_count: s.episodeCount ?? 0,
+        xiaoyuzhou_subscribers: kind === "xyz" ? s.subs : null,
+        ximalaya_plays: kind === "xmly" ? s.plays : null,
+      });
+
+      return { ok: true as const, podcastId: pod.id as string, platform: kind };
+    } catch (e) {
+      return {
+        ok: false as const,
+        error: e instanceof Error ? e.message : "导入失败",
+        podcastId: null,
+      };
+    }
+  });
+
+// ---------- Cross-platform name search (Apple + Xiaoyuzhou + Ximalaya) ----------
+export type SearchHit = {
+  platform: "apple" | "xiaoyuzhou" | "ximalaya";
+  id: string;
+  title: string;
+  author: string | null;
+  url: string;
+  feedUrl: string | null;
+  artwork: string | null;
+};
+
+export const searchPodcastsAllPlatforms = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        query: z.string().trim().min(1).max(200),
+        market: z.enum(["cn", "na"]).default("cn"),
+        limit: z.number().int().min(1).max(10).default(5),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const results: SearchHit[] = [];
+    const country = data.market === "na" ? "US" : "CN";
+
+    try {
+      const u = `https://itunes.apple.com/search?media=podcast&country=${country}&limit=${data.limit}&term=${encodeURIComponent(data.query)}`;
+      const r = await fetch(u);
+      if (r.ok) {
+        const j = (await r.json()) as { results?: Array<Record<string, unknown>> };
+        for (const it of j.results ?? []) {
+          if (!it.feedUrl) continue;
+          results.push({
+            platform: "apple",
+            id: String(it.collectionId ?? it.trackId ?? it.feedUrl),
+            title: String(it.collectionName ?? it.trackName ?? "Unknown"),
+            author: (it.artistName as string) ?? null,
+            url: (it.collectionViewUrl as string) ?? (it.feedUrl as string),
+            feedUrl: (it.feedUrl as string) ?? null,
+            artwork: ((it.artworkUrl600 ?? it.artworkUrl100) as string) ?? null,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("apple search failed", e);
+    }
+
+    if (data.market === "cn") {
+      try {
+        const fc = getFirecrawl();
+        const runSiteSearch = async (
+          site: string,
+          platform: "xiaoyuzhou" | "ximalaya",
+        ) => {
+          try {
+            const sr = (await fc.search(`${data.query} site:${site}`, {
+              limit: data.limit,
+            })) as {
+              web?: Array<{ url?: string; title?: string; description?: string }>;
+              data?: Array<{ url?: string; title?: string; description?: string }>;
+            };
+            const items = sr.web ?? sr.data ?? [];
+            for (const it of items) {
+              if (!it.url) continue;
+              const isHome =
+                platform === "xiaoyuzhou"
+                  ? /xiaoyuzhoufm\.com\/podcast\/[a-z0-9]+/i.test(it.url)
+                  : /ximalaya\.com\/(album|podcast)\/\d+/i.test(it.url);
+              if (!isHome) continue;
+              const title = (it.title ?? "")
+                .replace(/[\|\-–—]\s*(小宇宙|喜马拉雅|xiaoyuzhou|Ximalaya).*$/i, "")
+                .trim();
+              if (!title) continue;
+              results.push({
+                platform,
+                id: it.url,
+                title,
+                author: null,
+                url: it.url,
+                feedUrl: null,
+                artwork: null,
+              });
+            }
+          } catch (e) {
+            console.error(`${platform} search failed`, e);
+          }
+        };
+        await runSiteSearch("xiaoyuzhoufm.com", "xiaoyuzhou");
+        await runSiteSearch("ximalaya.com", "ximalaya");
+      } catch (e) {
+        console.error("firecrawl init failed", e);
+      }
+    }
+
+    return { ok: true as const, results };
   });
 
 // ---------- AI Ad Strategy ----------

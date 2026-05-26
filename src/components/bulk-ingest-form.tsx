@@ -2,6 +2,10 @@ import { useState, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import * as XLSX from "xlsx";
 import { ingestPodcast, searchPodcasts } from "@/lib/podcast.functions";
+import {
+  ingestFromPlatformUrl,
+  searchPodcastsAllPlatforms,
+} from "@/lib/insights.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
@@ -16,26 +20,28 @@ type Result = {
   message?: string;
 };
 
+const isUrl = (s: string) => /^https?:\/\//i.test(s);
+const isXyzUrl = (s: string) => /xiaoyuzhoufm\.com\/podcast\//i.test(s);
+const isXmlyUrl = (s: string) => /ximalaya\.com\/(album|podcast)\//i.test(s);
+const isPlatformUrl = (s: string) => isXyzUrl(s) || isXmlyUrl(s);
+
 export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
   const ingest = useServerFn(ingestPodcast);
-  const search = useServerFn(searchPodcasts);
+  const ingestPlatform = useServerFn(ingestFromPlatformUrl);
+  const searchApple = useServerFn(searchPodcasts);
+  const searchAll = useServerFn(searchPodcastsAllPlatforms);
   const fileRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<Result[]>([]);
   const [done, setDone] = useState(0);
 
-  const isUrl = (s: string) => /^https?:\/\//i.test(s);
-
-  // Split input into entries: each line is one entry; also allow comma/semicolon separators.
-  // URLs are kept as-is; names are kept as a single trimmed phrase per line.
   const extractEntries = (raw: string): string[] => {
     const entries = raw
       .split(/[\n;]+/)
       .flatMap((line) => {
         const trimmed = line.trim();
         if (!trimmed) return [];
-        // If a line is purely URLs, split by spaces/commas; otherwise treat the whole line as a name.
         const parts = trimmed.split(/[\s,]+/).filter(Boolean);
         if (parts.every(isUrl)) return parts;
         return [trimmed];
@@ -98,55 +104,75 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
     let failCount = 0;
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i];
-      try {
-        // Resolve name -> feedUrl via Apple search if not already a URL
-        let rssUrl = entry;
-        if (!isUrl(entry)) {
-          const sr = await search({ data: { query: entry, market, limit: 1 } });
-          if (!sr.ok || sr.results.length === 0) {
-            failCount++;
-            setResults((r) =>
-              r.map((x, idx) =>
-                idx === i
-                  ? {
-                      ...x,
-                      status: "fail",
-                      message:
-                        market === "na" ? "No match found" : "未搜到匹配的播客",
-                    }
-                  : x,
-              ),
-            );
-            setDone(i + 1);
-            continue;
-          }
-          rssUrl = sr.results[0].feedUrl;
-          setResults((r) =>
-            r.map((x, idx) => (idx === i ? { ...x, resolved: rssUrl } : x)),
-          );
-        }
-
-        const res = await ingest({ data: { rssUrl, market } });
-        if (res.ok === false) {
-          failCount++;
-          setResults((r) =>
-            r.map((x, idx) =>
-              idx === i ? { ...x, status: "fail", message: res.error } : x,
-            ),
-          );
-          setDone(i + 1);
-          continue;
-        }
-        okCount++;
-        setResults((r) =>
-          r.map((x, idx) => (idx === i ? { ...x, status: "ok" } : x)),
-        );
-      } catch (err) {
+      const markFail = (msg: string) => {
         failCount++;
-        const msg = err instanceof Error ? err.message : "Failed";
         setResults((r) =>
           r.map((x, idx) => (idx === i ? { ...x, status: "fail", message: msg } : x)),
         );
+      };
+      const markResolved = (resolved: string) =>
+        setResults((r) => r.map((x, idx) => (idx === i ? { ...x, resolved } : x)));
+      const markOk = () => {
+        okCount++;
+        setResults((r) => r.map((x, idx) => (idx === i ? { ...x, status: "ok" } : x)));
+      };
+
+      try {
+        // Case 1: Xiaoyuzhou / Ximalaya homepage URL
+        if (isUrl(entry) && isPlatformUrl(entry)) {
+          markResolved(isXyzUrl(entry) ? "小宇宙" : "喜马拉雅");
+          const res = await ingestPlatform({ data: { url: entry, market } });
+          if (res.ok === false) {
+            markFail(res.error);
+          } else {
+            markOk();
+          }
+          setDone(i + 1);
+          continue;
+        }
+
+        // Case 2: RSS URL
+        if (isUrl(entry)) {
+          const res = await ingest({ data: { rssUrl: entry, market } });
+          if (res.ok === false) markFail(res.error);
+          else markOk();
+          setDone(i + 1);
+          continue;
+        }
+
+        // Case 3: podcast name — try Apple first, then CN platforms
+        const apple = await searchApple({ data: { query: entry, market, limit: 1 } });
+        if (apple.ok && apple.results.length > 0) {
+          const feedUrl = apple.results[0].feedUrl;
+          markResolved(`Apple → ${feedUrl}`);
+          const res = await ingest({ data: { rssUrl: feedUrl, market } });
+          if (res.ok === false) markFail(res.error);
+          else markOk();
+          setDone(i + 1);
+          continue;
+        }
+
+        // Fallback: Xiaoyuzhou / Ximalaya search (CN only)
+        if (market === "cn") {
+          const all = await searchAll({ data: { query: entry, market, limit: 3 } });
+          const hit = all.results.find(
+            (r) => r.platform === "xiaoyuzhou" || r.platform === "ximalaya",
+          );
+          if (hit) {
+            markResolved(
+              `${hit.platform === "xiaoyuzhou" ? "小宇宙" : "喜马拉雅"} → ${hit.url}`,
+            );
+            const res = await ingestPlatform({ data: { url: hit.url, market } });
+            if (res.ok === false) markFail(res.error);
+            else markOk();
+            setDone(i + 1);
+            continue;
+          }
+        }
+
+        markFail(market === "na" ? "No match found" : "Apple/小宇宙/喜马拉雅 均未找到匹配");
+      } catch (err) {
+        markFail(err instanceof Error ? err.message : "Failed");
       }
       setDone(i + 1);
     }
@@ -175,15 +201,15 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={t(
-              "每行一个：可填播客名称或 RSS 链接\n日谈公园\n商业就是这样\nhttps://feeds.example.com/podcast.xml",
+              "每行一个：播客名称 / 小宇宙主页 / 喜马拉雅主页 / RSS 链接\n日谈公园\nhttps://www.xiaoyuzhoufm.com/podcast/5e7c3...\nhttps://www.ximalaya.com/album/12345678\nhttps://feeds.example.com/podcast.xml",
               "One per line: podcast name or RSS URL\nThe Daily\nhttps://feeds.example.com/podcast.xml",
             )}
-            className="min-h-[140px] font-mono text-xs"
+            className="min-h-[160px] font-mono text-xs"
           />
           <p className="mt-1.5 text-[11px] text-muted-foreground">
             {t(
-              "名称将通过 Apple Podcasts 自动匹配最相似的播客",
-              "Names are auto-matched via Apple Podcasts search",
+              "名称将依次尝试 Apple Podcasts → 小宇宙 → 喜马拉雅 自动匹配",
+              "Names auto-matched via Apple Podcasts",
             )}
           </p>
         </TabsContent>
@@ -192,8 +218,8 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
             <FileSpreadsheet className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
             <p className="mb-3 text-sm text-muted-foreground">
               {t(
-                "支持 .xlsx / .xls / .csv，自动读取所有单元格（播客名或 RSS 链接）",
-                "Supports .xlsx / .xls / .csv — reads every cell (name or RSS URL)",
+                "支持 .xlsx / .xls / .csv —— 自动读取所有单元格（名称 / 小宇宙 / 喜马拉雅 / RSS）",
+                "Supports .xlsx / .xls / .csv — reads every cell (name or URL)",
               )}
             </p>
             <input
@@ -262,14 +288,12 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-mono">{r.input}</div>
-                  {r.resolved && r.resolved !== r.input && (
+                  {r.resolved && (
                     <div className="truncate text-[10px] text-muted-foreground">
                       → {r.resolved}
                     </div>
                   )}
-                  {r.message && (
-                    <div className="text-destructive">{r.message}</div>
-                  )}
+                  {r.message && <div className="text-destructive">{r.message}</div>}
                 </div>
               </div>
             ))}
