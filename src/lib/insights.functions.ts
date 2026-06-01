@@ -10,30 +10,43 @@ function getFirecrawl() {
   return new Firecrawl({ apiKey });
 }
 
-// ---------- Lovable AI ----------
-async function callLovableAI(
-  messages: Array<{ role: string; content: string }>,
-  opts?: { json?: boolean },
-): Promise<string> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY 未配置");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+// ---------- AI Gateway ----------
+type AiMessage = { role: string; content: string };
+
+function getAiConfig(modelEnvName: string) {
+  const baseUrl = process.env.AI_GATEWAY_URL ?? "https://api.openai.com/v1/chat/completions";
+  const apiKey = process.env.AI_GATEWAY_API_KEY ?? process.env.OPENAI_API_KEY;
+  const model = process.env[modelEnvName] ?? process.env.AI_MODEL ?? "gpt-5-mini";
+
+  if (!apiKey) {
+    throw new Error("AI_GATEWAY_API_KEY or OPENAI_API_KEY 未配置");
+  }
+
+  return { baseUrl, apiKey, model };
+}
+
+async function callAiGateway(
+  messages: AiMessage[],
+  opts?: { json?: boolean; modelEnvName?: string },
+): Promise<{ content: string; model: string }> {
+  const { baseUrl, apiKey, model } = getAiConfig(opts?.modelEnvName ?? "AI_STRATEGY_MODEL");
+  const res = await fetch(baseUrl, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${key}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model,
       messages,
       ...(opts?.json ? { response_format: { type: "json_object" } } : {}),
     }),
   });
   if (res.status === 429) throw new Error("AI 调用过于频繁，请稍后再试");
-  if (res.status === 402) throw new Error("AI 额度已用尽，请在 Settings → Usage 添加额度");
+  if (res.status === 402) throw new Error("AI 额度已用尽，请检查当前 AI 服务商额度");
   if (!res.ok) throw new Error(`AI 调用失败：${res.status}`);
   const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  return data.choices?.[0]?.message?.content ?? "";
+  return { content: data.choices?.[0]?.message?.content ?? "", model };
 }
 
 function safeParseJson(text: string): unknown {
@@ -498,13 +511,14 @@ ${(eps ?? []).map((e, i) => `${i + 1}. ${e.title}`).join("\n")}
 }
 要求推荐 6-8 个真实存在的、中国市场常见的品牌，覆盖不同品类，按 fit_score 降序。`;
 
-    const raw = await callLovableAI(
+    const ai = await callAiGateway(
       [
         { role: "system", content: "你是资深中文播客广告策略顾问，只输出严格 JSON。" },
         { role: "user", content: prompt },
       ],
-      { json: true },
+      { json: true, modelEnvName: "AI_STRATEGY_MODEL" },
     );
+    const raw = ai.content;
     const parsed = safeParseJson(raw) as AdStrategy | null;
     if (!parsed) throw new Error("AI 返回格式无法解析");
 
@@ -749,32 +763,21 @@ ${inventoryText || "（暂无符合层级的播客，请给出通用建议）"}
 - budget_allocation 总和应等于总预算。
 - 所有金额按人民币元。`;
 
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY 未配置");
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai/gpt-5-mini",
-        messages: [
-          { role: "system", content: "你是中文播客广告投放规划专家，只输出严格 JSON。" },
-          { role: "user", content: prompt },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
-    if (res.status === 429) throw new Error("AI 调用过于频繁，请稍后再试");
-    if (res.status === 402) throw new Error("AI 额度已用尽，请在 Settings → Usage 添加额度");
-    if (!res.ok) throw new Error(`AI 调用失败：${res.status}`);
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = json.choices?.[0]?.message?.content ?? "";
+    const ai = await callAiGateway(
+      [
+        { role: "system", content: "你是中文播客广告投放规划专家，只输出严格 JSON。" },
+        { role: "user", content: prompt },
+      ],
+      { json: true, modelEnvName: "AI_PLANNER_MODEL" },
+    );
+    const raw = ai.content;
     const parsed = safeParseJson(raw);
     if (!parsed) throw new Error("AI 返回格式无法解析");
 
     return {
       plan: parsed,
       inventorySize: candidates.length,
-      model: "openai/gpt-5-mini",
+      model: ai.model,
     };
   });
 
@@ -855,25 +858,14 @@ Return strict JSON (no markdown, no extra text) matching:
 }
 Recommend 6-8 real Chinese cross-border / global brands (e.g. SHEIN, Anker, Temu, DJI, Insta360, Cider, Lenovo, Hisense, Xiaomi, Yeedi, Roborock, BYD, MiHoYo, ByteDance/TikTok apps, SHEGLAM, Ulike, Laifen) sorted by fit_score desc.`;
 
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY not configured");
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai/gpt-5-mini",
-        messages: [
-          { role: "system", content: "You are a senior US podcast ad strategist. Output strict JSON only." },
-          { role: "user", content: prompt },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
-    if (res.status === 429) throw new Error("AI rate-limited, please retry shortly");
-    if (res.status === 402) throw new Error("AI credits exhausted — top up in Settings → Usage");
-    if (!res.ok) throw new Error(`AI call failed: ${res.status}`);
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = json.choices?.[0]?.message?.content ?? "";
+    const ai = await callAiGateway(
+      [
+        { role: "system", content: "You are a senior US podcast ad strategist. Output strict JSON only." },
+        { role: "user", content: prompt },
+      ],
+      { json: true, modelEnvName: "AI_STRATEGY_MODEL" },
+    );
+    const raw = ai.content;
     const parsed = safeParseJson(raw) as OverseasStrategy | null;
     if (!parsed) throw new Error("AI returned unparsable JSON");
 
@@ -987,31 +979,20 @@ Rules:
 - All amounts in USD.
 - Tailor cultural_localization_tips specifically to a Chinese brand entering NA (brand naming, claims, voice/accent, FTC disclosure).`;
 
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY not configured");
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "openai/gpt-5-mini",
-        messages: [
-          { role: "system", content: "You are a cross-border podcast ad strategist. Output strict JSON only." },
-          { role: "user", content: prompt },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
-    if (res.status === 429) throw new Error("AI rate-limited, please retry shortly");
-    if (res.status === 402) throw new Error("AI credits exhausted — top up in Settings → Usage");
-    if (!res.ok) throw new Error(`AI call failed: ${res.status}`);
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = json.choices?.[0]?.message?.content ?? "";
+    const ai = await callAiGateway(
+      [
+        { role: "system", content: "You are a cross-border podcast ad strategist. Output strict JSON only." },
+        { role: "user", content: prompt },
+      ],
+      { json: true, modelEnvName: "AI_PLANNER_MODEL" },
+    );
+    const raw = ai.content;
     const parsed = safeParseJson(raw);
     if (!parsed) throw new Error("AI returned unparsable JSON");
 
     return {
       plan: parsed,
       inventorySize: candidates.length,
-      model: "openai/gpt-5-mini",
+      model: ai.model,
     };
   });
