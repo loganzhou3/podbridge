@@ -232,8 +232,13 @@ function PodcastDetail() {
             podcastId={p.id}
             xiaoyuzhouUrl={p.xiaoyuzhou_url ?? null}
             ximalayaUrl={p.ximalaya_url ?? null}
+            itunesUrl={p.itunes_url ?? null}
             xiaoyuzhouSubs={p.xiaoyuzhou_subscribers ?? null}
+            xiaoyuzhouComments={(p as any).xiaoyuzhou_comments ?? null}
             ximalayaPlays={p.ximalaya_plays ?? null}
+            ximalayaSubs={(p as any).ximalaya_subscribers ?? null}
+            ximalayaComments={(p as any).ximalaya_comments ?? null}
+            appleReviews={(p as any).apple_reviews ?? null}
           />
         </div>
 
