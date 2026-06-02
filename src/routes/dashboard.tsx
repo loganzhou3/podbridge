@@ -10,7 +10,7 @@ import { listPodcasts, listBrandCategories } from "@/lib/podcast.functions";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Activity, Clock, Tag, TrendingUp, Loader2, Search, X, Folder, Users } from "lucide-react";
+import { Activity, Clock, Tag, TrendingUp, Loader2, Search, X, Folder, Users, Headphones } from "lucide-react";
 
 type SubTier = "all" | "lt1k" | "1k-1w" | "1w-10w" | "gt10w" | "unknown";
 
@@ -40,6 +40,12 @@ function fmtDate(iso: string | null) {
   if (diff < 1) return "今日";
   if (diff < 30) return `${diff} 天前`;
   return d.toISOString().slice(0, 10);
+}
+
+function fmtCnNum(n: number | null | undefined): string {
+  if (n == null || n === 0) return "";
+  if (n >= 10000) return `${(n / 10000).toFixed(1)}万`;
+  return String(n);
 }
 
 function ScoreBar({ value, label }: { value: number; label: string }) {
@@ -361,7 +367,33 @@ function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4">
+              {(() => {
+                const xy = (p as { xiaoyuzhou_subscribers?: number | null }).xiaoyuzhou_subscribers;
+                const xm = (p as { ximalaya_subscribers?: number | null }).ximalaya_subscribers;
+                const ap = (p as { apple_subscribers?: number | null }).apple_subscribers;
+                const parts: { label: string; val: string }[] = [];
+                if (xy) parts.push({ label: "小宇宙", val: fmtCnNum(xy) });
+                if (xm) parts.push({ label: "喜马拉雅", val: fmtCnNum(xm) });
+                if (ap) parts.push({ label: "Apple", val: fmtCnNum(ap) });
+                if (parts.length === 0) return null;
+                return (
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1 font-medium text-foreground">
+                      <Headphones className="h-3 w-3" />
+                      订阅
+                    </span>
+                    {parts.map((part, i) => (
+                      <span key={part.label}>
+                        {i > 0 && <span className="mr-2">·</span>}
+                        <span className="text-muted-foreground">{part.label}</span>{" "}
+                        <span className="font-medium tabular-nums text-foreground">{part.val}</span>
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              <div className="mt-3 grid grid-cols-3 gap-3 border-t border-border pt-3">
                 <ScoreBar value={p.commercial_score ?? 0} label="商业" />
                 <ScoreBar value={p.activity_score ?? 0} label="活跃" />
                 <ScoreBar value={p.growth_score ?? 0} label="增长" />

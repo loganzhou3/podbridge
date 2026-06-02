@@ -582,10 +582,10 @@ export const listPodcasts = createServerFn({ method: "POST" })
     const PAGE = 1000;
     const all: any[] = [];
     for (let from = 0; from < MAX_TOTAL; from += PAGE) {
-      let q = supabaseAdmin
+    let q = supabaseAdmin
         .from("podcasts")
         .select(
-          "id,title,author,image_url,category,episode_count,latest_episode_at,update_frequency_days,commercial_score,activity_score,growth_score,lifecycle_stage,audience_tags,market,xiaoyuzhou_subscribers,ximalaya_plays",
+          "id,title,author,image_url,category,episode_count,latest_episode_at,update_frequency_days,commercial_score,activity_score,growth_score,lifecycle_stage,audience_tags,market,xiaoyuzhou_subscribers,ximalaya_plays,ximalaya_subscribers,apple_subscribers",
         )
         .eq("market", market)
         .order("commercial_score", { ascending: false })
