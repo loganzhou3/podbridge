@@ -10,7 +10,7 @@ import { listPodcasts, listBrandCategories } from "@/lib/podcast.functions";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Activity, Clock, Tag, TrendingUp, Loader2, Search, X, Folder, Users } from "lucide-react";
+import { Activity, Clock, Tag, TrendingUp, Loader2, Search, X, Folder, Users, Headphones } from "lucide-react";
 
 type SubTier = "all" | "lt1k" | "1k-1w" | "1w-10w" | "gt10w" | "unknown";
 
