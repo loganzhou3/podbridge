@@ -42,6 +42,12 @@ function fmtDate(iso: string | null) {
   return d.toISOString().slice(0, 10);
 }
 
+function fmtCnNum(n: number | null | undefined): string {
+  if (n == null || n === 0) return "";
+  if (n >= 10000) return `${(n / 10000).toFixed(1)}万`;
+  return String(n);
+}
+
 function ScoreBar({ value, label }: { value: number; label: string }) {
   const color =
     value >= 75 ? "var(--success)" : value >= 50 ? "var(--brand)" : "var(--warning)";
