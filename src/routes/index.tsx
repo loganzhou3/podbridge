@@ -80,7 +80,7 @@ function Index() {
                 className="ml-2 bg-clip-text text-transparent"
                 style={{ backgroundImage: "var(--gradient-brand)" }}
               >
-                每一档中文播客
+                每一档播客
               </span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-balance text-lg text-muted-foreground">
