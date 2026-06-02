@@ -367,7 +367,33 @@ function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4">
+              {(() => {
+                const xy = (p as { xiaoyuzhou_subscribers?: number | null }).xiaoyuzhou_subscribers;
+                const xm = (p as { ximalaya_subscribers?: number | null }).ximalaya_subscribers;
+                const ap = (p as { apple_subscribers?: number | null }).apple_subscribers;
+                const parts: { label: string; val: string }[] = [];
+                if (xy) parts.push({ label: "小宇宙", val: fmtCnNum(xy) });
+                if (xm) parts.push({ label: "喜马拉雅", val: fmtCnNum(xm) });
+                if (ap) parts.push({ label: "Apple", val: fmtCnNum(ap) });
+                if (parts.length === 0) return null;
+                return (
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1 font-medium text-foreground">
+                      <Headphones className="h-3 w-3" />
+                      订阅
+                    </span>
+                    {parts.map((part, i) => (
+                      <span key={part.label}>
+                        {i > 0 && <span className="mr-2">·</span>}
+                        <span className="text-muted-foreground">{part.label}</span>{" "}
+                        <span className="font-medium tabular-nums text-foreground">{part.val}</span>
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              <div className="mt-3 grid grid-cols-3 gap-3 border-t border-border pt-3">
                 <ScoreBar value={p.commercial_score ?? 0} label="商业" />
                 <ScoreBar value={p.activity_score ?? 0} label="活跃" />
                 <ScoreBar value={p.growth_score ?? 0} label="增长" />
