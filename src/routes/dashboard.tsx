@@ -72,6 +72,8 @@ function ScoreBar({ value, label }: { value: number; label: string }) {
 function DashboardPage() {
   const list = useServerFn(listPodcasts);
   const listCats = useServerFn(listBrandCategories);
+  const bulkRefresh = useServerFn(bulkRefreshTracking);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [brandInput, setBrandInput] = useState("");
   const [brand, setBrand] = useState("");
