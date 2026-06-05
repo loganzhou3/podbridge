@@ -238,6 +238,218 @@ export const scrapePodcastPlatforms = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+// ---------- Auto-discover Xiaoyuzhou / Ximalaya homepage URLs by name ----------
+function normalizeTitle(s: string): string {
+  return s.toLowerCase().replace(/[\s|｜\-–—_·•．、,，.。()（）【】\[\]"'’“”]+/g, "");
+}
+
+async function discoverPlatformUrl(
+  title: string,
+  author: string | null,
+  platform: "xiaoyuzhou" | "ximalaya",
+): Promise<string | null> {
+  const site = platform === "xiaoyuzhou" ? "xiaoyuzhoufm.com" : "ximalaya.com";
+  const homeRe =
+    platform === "xiaoyuzhou"
+      ? /https?:\/\/(?:www\.)?xiaoyuzhoufm\.com\/podcast\/[a-z0-9]+/i
+      : /https?:\/\/(?:www\.)?ximalaya\.com\/(?:album|podcast)\/\d+/i;
+  const fc = getFirecrawl();
+  const query = author ? `"${title}" ${author} site:${site}` : `"${title}" site:${site}`;
+  try {
+    const sr = (await fc.search(query, { limit: 5 })) as {
+      web?: Array<{ url?: string; title?: string }>;
+      data?: Array<{ url?: string; title?: string }>;
+    };
+    const items = sr.web ?? sr.data ?? [];
+    const target = normalizeTitle(title);
+    let fallback: string | null = null;
+    for (const it of items) {
+      if (!it.url) continue;
+      const m = it.url.match(homeRe);
+      if (!m) continue;
+      const homeUrl = m[0];
+      const t = normalizeTitle((it.title ?? "").replace(/[\|\-–—]\s*(小宇宙|喜马拉雅|xiaoyuzhou|Ximalaya).*$/i, ""));
+      if (t && (t.includes(target) || target.includes(t))) return homeUrl;
+      if (!fallback) fallback = homeUrl;
+    }
+    return fallback;
+  } catch (e) {
+    console.error(`discover ${platform} failed`, e);
+    return null;
+  }
+}
+
+export const autoDiscoverPlatformUrls = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ podcastId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { data: pod, error } = await supabaseAdmin
+      .from("podcasts")
+      .select("id,title,author,xiaoyuzhou_url,ximalaya_url")
+      .eq("id", data.podcastId)
+      .single();
+    if (error || !pod) throw new Error("播客不存在");
+    if (!pod.title) return { ok: false as const, error: "缺少播客标题" };
+
+    const updates: { xiaoyuzhou_url?: string; ximalaya_url?: string; updated_at: string } = {
+      updated_at: new Date().toISOString(),
+    };
+    let discoveredXyz: string | null = null;
+    let discoveredXmly: string | null = null;
+    if (!pod.xiaoyuzhou_url) {
+      discoveredXyz = await discoverPlatformUrl(pod.title, pod.author, "xiaoyuzhou");
+      if (discoveredXyz) updates.xiaoyuzhou_url = discoveredXyz;
+    }
+    if (!pod.ximalaya_url) {
+      discoveredXmly = await discoverPlatformUrl(pod.title, pod.author, "ximalaya");
+      if (discoveredXmly) updates.ximalaya_url = discoveredXmly;
+    }
+    if (discoveredXyz || discoveredXmly) {
+      await supabaseAdmin.from("podcasts").update(updates).eq("id", data.podcastId);
+    }
+    return {
+      ok: true as const,
+      xiaoyuzhou: discoveredXyz ?? pod.xiaoyuzhou_url ?? null,
+      ximalaya: discoveredXmly ?? pod.ximalaya_url ?? null,
+    };
+  });
+
+// ---------- Refresh tracking for one podcast (discover -> scrape -> snapshot) ----------
+async function refreshOnePodcast(podcastId: string): Promise<{
+  ok: boolean;
+  discovered?: { xyz?: boolean; xmly?: boolean };
+  error?: string;
+}> {
+  const { data: pod, error } = await supabaseAdmin
+    .from("podcasts")
+    .select("id,title,author,xiaoyuzhou_url,ximalaya_url")
+    .eq("id", podcastId)
+    .single();
+  if (error || !pod) return { ok: false, error: "播客不存在" };
+
+  const discovered = { xyz: false, xmly: false };
+  if (!pod.xiaoyuzhou_url && pod.title) {
+    const u = await discoverPlatformUrl(pod.title, pod.author, "xiaoyuzhou");
+    if (u) {
+      pod.xiaoyuzhou_url = u;
+      discovered.xyz = true;
+      await supabaseAdmin
+        .from("podcasts")
+        .update({ xiaoyuzhou_url: u, updated_at: new Date().toISOString() })
+        .eq("id", podcastId);
+    }
+  }
+  if (!pod.ximalaya_url && pod.title) {
+    const u = await discoverPlatformUrl(pod.title, pod.author, "ximalaya");
+    if (u) {
+      pod.ximalaya_url = u;
+      discovered.xmly = true;
+      await supabaseAdmin
+        .from("podcasts")
+        .update({ ximalaya_url: u, updated_at: new Date().toISOString() })
+        .eq("id", podcastId);
+    }
+  }
+
+  if (!pod.xiaoyuzhou_url && !pod.ximalaya_url) {
+    return { ok: false, discovered, error: "未发现公开主页链接" };
+  }
+
+  const updates: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+    last_synced_at: new Date().toISOString(),
+  };
+  let xyzSubs: number | null = null;
+  let xmlyPlays: number | null = null;
+  let epCount: number | null = null;
+  if (pod.xiaoyuzhou_url) {
+    try {
+      const s = await scrapePlatformUrl(pod.xiaoyuzhou_url, "xyz");
+      updates.xiaoyuzhou_subscribers = s.subs;
+      updates.xiaoyuzhou_comments = s.comments;
+      updates.xiaoyuzhou_episode_count = s.episodeCount;
+      xyzSubs = s.subs;
+      epCount = s.episodeCount;
+    } catch (e) {
+      console.error("xyz scrape failed", e);
+    }
+  }
+  if (pod.ximalaya_url) {
+    try {
+      const s = await scrapePlatformUrl(pod.ximalaya_url, "xmly");
+      updates.ximalaya_plays = s.plays;
+      updates.ximalaya_subscribers = s.subs;
+      updates.ximalaya_comments = s.comments;
+      xmlyPlays = s.plays;
+      if (!epCount) epCount = s.episodeCount;
+    } catch (e) {
+      console.error("xmly scrape failed", e);
+    }
+  }
+  await supabaseAdmin.from("podcasts").update(updates).eq("id", podcastId);
+
+  // Write snapshot for tracking — daily delta vs latest snapshot
+  let prevPlays: number | null = null;
+  const { data: prev } = await supabaseAdmin
+    .from("snapshots")
+    .select("ximalaya_plays")
+    .eq("podcast_id", podcastId)
+    .order("taken_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (prev && typeof prev.ximalaya_plays === "number") prevPlays = prev.ximalaya_plays;
+  const delta =
+    xmlyPlays != null && prevPlays != null ? Math.max(0, xmlyPlays - prevPlays) : null;
+
+  await supabaseAdmin.from("snapshots").insert({
+    podcast_id: podcastId,
+    episode_count: epCount,
+    xiaoyuzhou_subscribers: xyzSubs,
+    ximalaya_plays: xmlyPlays,
+    daily_play_delta: delta,
+  });
+
+  return { ok: true, discovered };
+}
+
+export const refreshPodcastTracking = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ podcastId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    return refreshOnePodcast(data.podcastId);
+  });
+
+export const bulkRefreshTracking = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({ limit: z.number().int().min(1).max(100).default(30) })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    const { data: pods, error } = await supabaseAdmin
+      .from("podcasts")
+      .select("id")
+      .order("last_synced_at", { ascending: true, nullsFirst: true })
+      .limit(data.limit);
+    if (error) throw new Error(error.message);
+    const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+    let discoveredCount = 0;
+    for (const p of pods ?? []) {
+      const r = await refreshOnePodcast(p.id);
+      if (r.discovered?.xyz || r.discovered?.xmly) discoveredCount++;
+      results.push({ id: p.id, ok: r.ok, error: r.error });
+    }
+    const okCount = results.filter((r) => r.ok).length;
+    return {
+      ok: true as const,
+      total: results.length,
+      success: okCount,
+      discovered: discoveredCount,
+    };
+  });
+
 // ---------- Ingest directly from Xiaoyuzhou / Ximalaya homepage URL ----------
 function detectPlatform(url: string): "xyz" | "xmly" | null {
   if (/xiaoyuzhoufm\.com\/podcast/i.test(url)) return "xyz";
