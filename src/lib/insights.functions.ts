@@ -356,7 +356,16 @@ async function refreshOnePodcast(podcastId: string): Promise<{
     return { ok: false, discovered, error: "未发现公开主页链接" };
   }
 
-  const updates: Record<string, unknown> = {
+  const updates: {
+    updated_at: string;
+    last_synced_at: string;
+    xiaoyuzhou_subscribers?: number | null;
+    xiaoyuzhou_comments?: number | null;
+    xiaoyuzhou_episode_count?: number | null;
+    ximalaya_plays?: number | null;
+    ximalaya_subscribers?: number | null;
+    ximalaya_comments?: number | null;
+  } = {
     updated_at: new Date().toISOString(),
     last_synced_at: new Date().toISOString(),
   };
