@@ -140,24 +140,12 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
           continue;
         }
 
-        // Case 3: podcast name — try Apple first, then CN platforms
-        const apple = await searchApple({ data: { query: entry, market, limit: 1 } });
-        if (apple.ok && apple.results.length > 0) {
-          const feedUrl = apple.results[0].feedUrl;
-          markResolved(`Apple → ${feedUrl}`);
-          const res = await ingest({ data: { rssUrl: feedUrl, market } });
-          if (res.ok === false) markFail(res.error);
-          else markOk();
-          setDone(i + 1);
-          continue;
-        }
-
-        // Fallback: Xiaoyuzhou / Ximalaya search (CN only)
+        // Case 3: podcast name — prioritize XYZ/XMLY (CN), Apple is last fallback
         if (market === "cn") {
-          const all = await searchAll({ data: { query: entry, market, limit: 3 } });
-          const hit = all.results.find(
-            (r) => r.platform === "xiaoyuzhou" || r.platform === "ximalaya",
-          );
+          const all = await searchAll({ data: { query: entry, market, limit: 5 } });
+          const hit =
+            all.results.find((r) => r.platform === "xiaoyuzhou") ??
+            all.results.find((r) => r.platform === "ximalaya");
           if (hit) {
             markResolved(
               `${hit.platform === "xiaoyuzhou" ? "小宇宙" : "喜马拉雅"} → ${hit.url}`,
@@ -170,7 +158,19 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
           }
         }
 
-        markFail(market === "na" ? "No match found" : "Apple/小宇宙/喜马拉雅 均未找到匹配");
+        // Apple Podcasts fallback
+        const apple = await searchApple({ data: { query: entry, market, limit: 1 } });
+        if (apple.ok && apple.results.length > 0) {
+          const feedUrl = apple.results[0].feedUrl;
+          markResolved(`Apple → ${feedUrl}`);
+          const res = await ingest({ data: { rssUrl: feedUrl, market } });
+          if (res.ok === false) markFail(res.error);
+          else markOk();
+          setDone(i + 1);
+          continue;
+        }
+
+        markFail(market === "na" ? "No match found" : "小宇宙/喜马拉雅/Apple 均未找到匹配");
       } catch (err) {
         markFail(err instanceof Error ? err.message : "Failed");
       }
