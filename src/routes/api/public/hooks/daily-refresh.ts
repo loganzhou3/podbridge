@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ingestPodcast } from "@/lib/podcast.functions";
-import { scrapePodcastPlatforms } from "@/lib/insights.functions";
+import { refreshPodcastTracking } from "@/lib/insights.functions";
 
 export const Route = createFileRoute("/api/public/hooks/daily-refresh")({
   server: {
@@ -16,31 +16,32 @@ export const Route = createFileRoute("/api/public/hooks/daily-refresh")({
           return new Response(JSON.stringify({ error: error.message }), { status: 500 });
         }
 
-        const results: Array<{ id: string; ok: boolean; scraped?: boolean; error?: string }> = [];
+        const results: Array<{ id: string; ok: boolean; tracked?: boolean; error?: string }> = [];
         for (const p of pods ?? []) {
           try {
-            // 1) Scrape platform metrics first so snapshot captures current values
-            let scraped = false;
-            if (p.xiaoyuzhou_url || p.ximalaya_url) {
-              try {
-                await scrapePodcastPlatforms({ data: { podcastId: p.id } });
-                scraped = true;
-              } catch (e) {
-                console.error("scrape failed", p.id, e);
+            // 1) Discover (if needed) + scrape platforms + write snapshot
+            let tracked = false;
+            try {
+              const r = await refreshPodcastTracking({ data: { podcastId: p.id } });
+              tracked = r.ok;
+            } catch (e) {
+              console.error("track failed", p.id, e);
+            }
+
+            // 2) Re-ingest RSS if available — keeps RSS-derived fields fresh
+            if (p.rss_url) {
+              const ingestResult = await ingestPodcast({
+                data: {
+                  rssUrl: p.rss_url,
+                  market: (p.market === "na" ? "na" : "cn") as "cn" | "na",
+                },
+              });
+              if (ingestResult.ok === false) {
+                results.push({ id: p.id, ok: false, tracked, error: ingestResult.error });
+                continue;
               }
             }
-            // 2) Re-ingest RSS — writes a fresh snapshot incl. daily delta
-            const ingestResult = await ingestPodcast({
-              data: {
-                rssUrl: p.rss_url,
-                market: (p.market === "na" ? "na" : "cn") as "cn" | "na",
-              },
-            });
-            if (ingestResult.ok === false) {
-              results.push({ id: p.id, ok: false, scraped, error: ingestResult.error });
-              continue;
-            }
-            results.push({ id: p.id, ok: true, scraped });
+            results.push({ id: p.id, ok: true, tracked });
           } catch (e) {
             results.push({
               id: p.id,
