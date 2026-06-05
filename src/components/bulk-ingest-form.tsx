@@ -140,24 +140,12 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
           continue;
         }
 
-        // Case 3: podcast name — try Apple first, then CN platforms
-        const apple = await searchApple({ data: { query: entry, market, limit: 1 } });
-        if (apple.ok && apple.results.length > 0) {
-          const feedUrl = apple.results[0].feedUrl;
-          markResolved(`Apple → ${feedUrl}`);
-          const res = await ingest({ data: { rssUrl: feedUrl, market } });
-          if (res.ok === false) markFail(res.error);
-          else markOk();
-          setDone(i + 1);
-          continue;
-        }
-
-        // Fallback: Xiaoyuzhou / Ximalaya search (CN only)
+        // Case 3: podcast name — prioritize XYZ/XMLY (CN), Apple is last fallback
         if (market === "cn") {
-          const all = await searchAll({ data: { query: entry, market, limit: 3 } });
-          const hit = all.results.find(
-            (r) => r.platform === "xiaoyuzhou" || r.platform === "ximalaya",
-          );
+          const all = await searchAll({ data: { query: entry, market, limit: 5 } });
+          const hit =
+            all.results.find((r) => r.platform === "xiaoyuzhou") ??
+            all.results.find((r) => r.platform === "ximalaya");
           if (hit) {
             markResolved(
               `${hit.platform === "xiaoyuzhou" ? "小宇宙" : "喜马拉雅"} → ${hit.url}`,
@@ -170,7 +158,19 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
           }
         }
 
-        markFail(market === "na" ? "No match found" : "Apple/小宇宙/喜马拉雅 均未找到匹配");
+        // Apple Podcasts fallback
+        const apple = await searchApple({ data: { query: entry, market, limit: 1 } });
+        if (apple.ok && apple.results.length > 0) {
+          const feedUrl = apple.results[0].feedUrl;
+          markResolved(`Apple → ${feedUrl}`);
+          const res = await ingest({ data: { rssUrl: feedUrl, market } });
+          if (res.ok === false) markFail(res.error);
+          else markOk();
+          setDone(i + 1);
+          continue;
+        }
+
+        markFail(market === "na" ? "No match found" : "小宇宙/喜马拉雅/Apple 均未找到匹配");
       } catch (err) {
         markFail(err instanceof Error ? err.message : "Failed");
       }
@@ -208,7 +208,7 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
           />
           <p className="mt-1.5 text-[11px] text-muted-foreground">
             {t(
-              "名称将依次尝试 Apple Podcasts → 小宇宙 → 喜马拉雅 自动匹配",
+              "名称将依次尝试 小宇宙 → 喜马拉雅 → Apple Podcasts 自动匹配（重点抓取小宇宙 / 喜马拉雅订阅与评论数据）",
               "Names auto-matched via Apple Podcasts",
             )}
           </p>

@@ -120,27 +120,104 @@ type PlatformScrape = {
   plays: number | null;
 };
 
+function parseLooseNumber(v: unknown): number | null {
+  if (v == null) return null;
+  if (typeof v === "number" && isFinite(v)) return Math.round(v);
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  if (!s) return null;
+  const m = s.match(/([\d.,]+)\s*([万亿]?)/);
+  if (!m) return null;
+  let val = parseFloat(m[1].replace(/,/g, ""));
+  if (!isFinite(val)) return null;
+  if (m[2] === "万") val *= 10000;
+  if (m[2] === "亿") val *= 1_0000_0000;
+  return Math.round(val);
+}
+
 async function scrapePlatformUrl(url: string, kind: "xyz" | "xmly"): Promise<PlatformScrape> {
   const fc = getFirecrawl();
-  const r = (await fc.scrape(url, {
-    formats: ["markdown"],
-    onlyMainContent: false,
-  })) as {
-    markdown?: string;
-    metadata?: { title?: string; description?: string; ogImage?: string; author?: string };
+
+  // Primary: JSON extraction targeted at XYZ/XMLY public stats
+  const prompt =
+    kind === "xyz"
+      ? "这是小宇宙(xiaoyuzhoufm)播客主页。提取 JSON：title(节目名,不含平台后缀)、author(主播)、description、image(封面url)、subscribers(订阅数,数字)、comments(评论总数,数字)、episodeCount(节目期数,数字)。数字若是'1.2万'按12000返回，找不到字段返回null。"
+      : "这是喜马拉雅(ximalaya)专辑主页。提取 JSON：title(专辑名,不含平台后缀)、author(主播/up主)、description、image(封面url)、subscribers(订阅数,数字)、plays(总播放量,数字)、comments(评论数,数字)、episodeCount(节目数,数字)。数字若是'1.2万'按12000返回，'3.4亿'按340000000返回，找不到字段返回null。";
+
+  const schema = {
+    type: "object",
+    properties: {
+      title: { type: ["string", "null"] },
+      author: { type: ["string", "null"] },
+      description: { type: ["string", "null"] },
+      image: { type: ["string", "null"] },
+      subscribers: { type: ["number", "string", "null"] },
+      plays: { type: ["number", "string", "null"] },
+      comments: { type: ["number", "string", "null"] },
+      episodeCount: { type: ["number", "string", "null"] },
+    },
+  } as const;
+
+  type JsonOut = {
+    title?: string | null;
+    author?: string | null;
+    description?: string | null;
+    image?: string | null;
+    subscribers?: number | string | null;
+    plays?: number | string | null;
+    comments?: number | string | null;
+    episodeCount?: number | string | null;
   };
-  const md = r.markdown ?? "";
-  const meta = r.metadata ?? {};
+
+  let jsonOut: JsonOut | null = null;
+  let md = "";
+  let meta: { title?: string; description?: string; ogImage?: string; author?: string } = {};
+
+  try {
+    const r = (await fc.scrape(url, {
+      formats: [
+        "markdown",
+        { type: "json", schema, prompt } as unknown as "markdown",
+      ],
+      onlyMainContent: false,
+      waitFor: 2500,
+    })) as {
+      markdown?: string;
+      json?: JsonOut;
+      metadata?: { title?: string; description?: string; ogImage?: string; author?: string };
+    };
+    md = r.markdown ?? "";
+    meta = r.metadata ?? {};
+    jsonOut = r.json ?? null;
+  } catch (e) {
+    console.error("firecrawl json scrape failed, falling back to markdown only", e);
+    const r = (await fc.scrape(url, {
+      formats: ["markdown"],
+      onlyMainContent: false,
+      waitFor: 2000,
+    })) as {
+      markdown?: string;
+      metadata?: { title?: string; description?: string; ogImage?: string; author?: string };
+    };
+    md = r.markdown ?? "";
+    meta = r.metadata ?? {};
+  }
+
   const imgMatch = md.match(/!\[[^\]]*\]\((https?:[^)\s]+)\)/);
-  const image = imgMatch?.[1] ?? meta.ogImage ?? null;
-  let title = meta.title ?? null;
+  let title = jsonOut?.title ?? meta.title ?? null;
   if (title) {
     title = title
       .replace(/[\|\-–—]\s*(小宇宙|喜马拉雅|xiaoyuzhou|Ximalaya).*$/i, "")
       .trim();
   }
-  const description = meta.description ?? null;
-  const author = meta.author ?? null;
+  const description = jsonOut?.description ?? meta.description ?? null;
+  const author = jsonOut?.author ?? meta.author ?? null;
+  const image = jsonOut?.image ?? imgMatch?.[1] ?? meta.ogImage ?? null;
+
+  const jsonSubs = parseLooseNumber(jsonOut?.subscribers);
+  const jsonComments = parseLooseNumber(jsonOut?.comments);
+  const jsonEp = parseLooseNumber(jsonOut?.episodeCount);
+  const jsonPlays = parseLooseNumber(jsonOut?.plays);
 
   if (kind === "xyz") {
     return {
@@ -148,10 +225,10 @@ async function scrapePlatformUrl(url: string, kind: "xyz" | "xmly"): Promise<Pla
       author,
       description,
       image,
-      subs: extractNumber(md, XYZ_SUBS_PATTERNS),
-      comments: extractNumber(md, XYZ_COMMENTS_PATTERNS),
-      episodeCount: extractNumber(md, XYZ_EPISODE_PATTERNS),
-      plays: null,
+      subs: jsonSubs ?? extractNumber(md, XYZ_SUBS_PATTERNS),
+      comments: jsonComments ?? extractNumber(md, XYZ_COMMENTS_PATTERNS),
+      episodeCount: jsonEp ?? extractNumber(md, XYZ_EPISODE_PATTERNS),
+      plays: jsonPlays,
     };
   }
   return {
@@ -159,10 +236,10 @@ async function scrapePlatformUrl(url: string, kind: "xyz" | "xmly"): Promise<Pla
     author,
     description,
     image,
-    subs: extractNumber(md, XMLY_SUBS_PATTERNS),
-    comments: extractNumber(md, XMLY_COMMENTS_PATTERNS),
-    episodeCount: extractNumber(md, XYZ_EPISODE_PATTERNS),
-    plays: extractNumber(md, XMLY_PLAYS_PATTERNS),
+    subs: jsonSubs ?? extractNumber(md, XMLY_SUBS_PATTERNS),
+    comments: jsonComments ?? extractNumber(md, XMLY_COMMENTS_PATTERNS),
+    episodeCount: jsonEp ?? extractNumber(md, XYZ_EPISODE_PATTERNS),
+    plays: jsonPlays ?? extractNumber(md, XMLY_PLAYS_PATTERNS),
   };
 }
 
