@@ -166,10 +166,39 @@ function DashboardPage() {
               按商业价值评分排序，点击卡片查看详细分析
             </p>
           </div>
-          <div className="hidden text-right md:block">
-            <div className="text-2xl font-bold tabular-nums">{podcasts.length}</div>
-            <div className="text-xs text-muted-foreground">
-              {hasFilter ? "符合筛选" : "已分析播客"}
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={refreshing}
+              onClick={async () => {
+                setRefreshing(true);
+                toast.info("正在自动发现并刷新订阅/播放数据，最多 30 档…");
+                try {
+                  const r = await bulkRefresh({ data: { limit: 30 } });
+                  toast.success(
+                    `已刷新 ${r.success}/${r.total} 档，新发现 ${r.discovered} 个公开主页`,
+                  );
+                  refetch();
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "刷新失败");
+                } finally {
+                  setRefreshing(false);
+                }
+              }}
+            >
+              {refreshing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              自动发现并追踪
+            </Button>
+            <div className="hidden text-right md:block">
+              <div className="text-2xl font-bold tabular-nums">{podcasts.length}</div>
+              <div className="text-xs text-muted-foreground">
+                {hasFilter ? "符合筛选" : "已分析播客"}
+              </div>
             </div>
           </div>
         </div>
