@@ -208,7 +208,7 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
           />
           <p className="mt-1.5 text-[11px] text-muted-foreground">
             {t(
-              "名称将依次尝试 Apple Podcasts → 小宇宙 → 喜马拉雅 自动匹配",
+              "名称将依次尝试 小宇宙 → 喜马拉雅 → Apple Podcasts 自动匹配（重点抓取小宇宙 / 喜马拉雅订阅与评论数据）",
               "Names auto-matched via Apple Podcasts",
             )}
           </p>
