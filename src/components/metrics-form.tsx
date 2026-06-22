@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { MetricTerm } from "@/components/metric-term";
 
 type Props = {
   podcastId: string;
@@ -22,6 +23,7 @@ type Props = {
     cpm_rate: number | null;
     metrics_notes: string | null;
     metrics_updated_at: string | null;
+    last_synced_at?: string | null;
   };
 };
 
@@ -29,6 +31,15 @@ function toNum(v: string): number | null {
   if (v.trim() === "") return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+function fmtLocalDate(iso: string) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
 }
 
 export function MetricsForm({ podcastId, initial }: Props) {
@@ -88,8 +99,10 @@ export function MetricsForm({ podcastId, initial }: Props) {
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
             手动登记用户画像、完播率、留存率等播客方提供的核心数据
-            {initial.metrics_updated_at
-              ? ` · 上次更新 ${new Date(initial.metrics_updated_at).toISOString().slice(0, 10)}`
+            {initial.last_synced_at
+              ? ` · 平台数据 ${fmtLocalDate(initial.last_synced_at)}`
+              : initial.metrics_updated_at
+                ? ` · 手动指标 ${fmtLocalDate(initial.metrics_updated_at)}`
               : ""}
           </p>
         </div>
@@ -131,7 +144,9 @@ export function MetricsForm({ podcastId, initial }: Props) {
           <Input id="mau" type="number" min="0" step="1" placeholder="例：120000" value={form.monthly_active_listeners} onChange={set("monthly_active_listeners")} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="cpm">CPM 报价 (元)</Label>
+          <Label htmlFor="cpm">
+            <MetricTerm term="CPM" /> 报价 (元)
+          </Label>
           <Input id="cpm" type="number" min="0" step="0.01" placeholder="例：180" value={form.cpm_rate} onChange={set("cpm_rate")} />
         </div>
         <div className="md:col-span-2 space-y-1.5">

@@ -1,0 +1,12 @@
+{
+  "buildCommand": "bun run build",
+  "installCommand": "bun install",
+  "framework": null,
+  "regions": ["sfo1"],
+  "crons": [
+    {
+      "path": "/api/public/hooks/daily-refresh",
+      "schedule": "10 0 * * *"
+    }
+  ]
+}

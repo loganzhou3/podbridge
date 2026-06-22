@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { runDailyRefreshCore } from "./lib/daily-refresh";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -76,5 +77,13 @@ export default {
       console.error(error);
       return brandedErrorResponse();
     }
+  },
+
+  async scheduled(_controller: unknown, _env: unknown, ctx: { waitUntil?: (promise: Promise<unknown>) => void }) {
+    const refresh = runDailyRefreshCore("cron").catch((error) => {
+      console.error("[daily-refresh] scheduled refresh failed", error);
+    });
+    ctx.waitUntil?.(refresh);
+    if (!ctx.waitUntil) await refresh;
   },
 };

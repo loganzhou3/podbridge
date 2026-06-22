@@ -11,6 +11,7 @@ import {
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider } from "@/lib/auth";
 
 function NotFoundComponent() {
   return (
@@ -81,14 +82,34 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "抓取喜马拉雅、小宇宙、Apple Podcasts 与北美英文播客数据，为广告主与跨境品牌提供商业价值评分与 AI 投放策略。",
       },
       { property: "og:title", content: "PodBridge — 播客数据与跨境投放平台" },
-      { property: "og:description", content: "Podcast Insights Hub analyzes Chinese podcasts by tracking comments, updates, charts, and social mentions." },
+      {
+        property: "og:description",
+        content:
+          "Podcast Insights Hub analyzes Chinese podcasts by tracking comments, updates, charts, and social mentions.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "PodBridge — 播客数据与跨境投放平台" },
-      { name: "description", content: "Podcast Insights Hub analyzes Chinese podcasts by tracking comments, updates, charts, and social mentions." },
-      { name: "twitter:description", content: "Podcast Insights Hub analyzes Chinese podcasts by tracking comments, updates, charts, and social mentions." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/13f7e0f9-b1af-43b1-bab3-9497a74108b0/id-preview-87dfaba6--b4f88854-1387-4ad4-a1c0-15b16ac12c86.lovable.app-1779282399512.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/13f7e0f9-b1af-43b1-bab3-9497a74108b0/id-preview-87dfaba6--b4f88854-1387-4ad4-a1c0-15b16ac12c86.lovable.app-1779282399512.png" },
+      {
+        name: "description",
+        content:
+          "Podcast Insights Hub analyzes Chinese podcasts by tracking comments, updates, charts, and social mentions.",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "Podcast Insights Hub analyzes Chinese podcasts by tracking comments, updates, charts, and social mentions.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/13f7e0f9-b1af-43b1-bab3-9497a74108b0/id-preview-87dfaba6--b4f88854-1387-4ad4-a1c0-15b16ac12c86.lovable.app-1779282399512.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/13f7e0f9-b1af-43b1-bab3-9497a74108b0/id-preview-87dfaba6--b4f88854-1387-4ad4-a1c0-15b16ac12c86.lovable.app-1779282399512.png",
+      },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),
@@ -117,7 +138,9 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
+      <AuthProvider>
+        <Outlet />
+      </AuthProvider>
       <ClientOnly fallback={null}>
         <Toaster richColors position="top-center" />
       </ClientOnly>
