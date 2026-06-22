@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -11,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { MetricTerm } from "@/components/metric-term";
 import { toast } from "sonner";
 import {
   Sparkles,
@@ -71,7 +73,7 @@ export function AdStrategyPanel({
             AI 投放策略
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            基于播客数据自动生成的广告位、CPM、口播形式与品牌建议
+            基于播客数据自动生成的广告位、千次曝光报价、口播形式与品牌建议
           </p>
         </div>
         <Button
@@ -102,7 +104,7 @@ export function AdStrategyPanel({
             <Stat label="目标听众画像" value={strategy.audience_persona} />
             <Stat label="最佳广告形式" value={strategy.best_ad_format} />
             <Stat
-              label="建议 CPM (¥)"
+              label={<><MetricTerm term="CPM" /> 建议报价 (¥)</>}
               value={`¥${strategy.recommended_cpm_rmb.min} – ¥${strategy.recommended_cpm_rmb.max}`}
             />
             <Stat label="最佳投放位" value={strategy.best_episode_slot} />
@@ -117,7 +119,7 @@ export function AdStrategyPanel({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value }: { label: ReactNode; value: string }) {
   return (
     <div className="rounded-lg border border-border bg-muted/30 p-3">
       <div className="text-xs text-muted-foreground">{label}</div>

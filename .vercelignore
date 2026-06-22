@@ -1,0 +1,15 @@
+.env
+.env.*
+!.env.example
+*.local
+dist
+dist-ssr
+.output
+.vinxi
+.nitro
+.tanstack
+.wrangler
+.dev.vars
+node_modules
+logs
+*.log

@@ -86,6 +86,387 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_briefs: {
+        Row: {
+          audience_notes: string | null
+          brand_name: string
+          budget_rmb: number
+          created_at: string
+          flight_end: string | null
+          flight_start: string | null
+          goal: string
+          id: string
+          product_description: string
+          status: string
+          target_tier: string
+          updated_at: string
+        }
+        Insert: {
+          audience_notes?: string | null
+          brand_name: string
+          budget_rmb: number
+          created_at?: string
+          flight_end?: string | null
+          flight_start?: string | null
+          goal: string
+          id?: string
+          product_description: string
+          status?: string
+          target_tier?: string
+          updated_at?: string
+        }
+        Update: {
+          audience_notes?: string | null
+          brand_name?: string
+          budget_rmb?: number
+          created_at?: string
+          flight_end?: string | null
+          flight_start?: string | null
+          goal?: string
+          id?: string
+          product_description?: string
+          status?: string
+          target_tier?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      campaigns: {
+        Row: {
+          actual_clicks: number | null
+          actual_conversions: number | null
+          actual_reach: number | null
+          actual_spend_rmb: number | null
+          brief_id: string | null
+          created_at: string
+          id: string
+          name: string
+          plan: Json | null
+          review_notes: string | null
+          review_summary: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          actual_clicks?: number | null
+          actual_conversions?: number | null
+          actual_reach?: number | null
+          actual_spend_rmb?: number | null
+          brief_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          plan?: Json | null
+          review_notes?: string | null
+          review_summary?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          actual_clicks?: number | null
+          actual_conversions?: number | null
+          actual_reach?: number | null
+          actual_spend_rmb?: number | null
+          brief_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          plan?: Json | null
+          review_notes?: string | null
+          review_summary?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      daily_refresh_runs: {
+        Row: {
+          discovered_count: number
+          discovery_attempts: number
+          error_message: string | null
+          failed_count: number
+          finished_at: string | null
+          id: string
+          refreshed_count: number
+          result: Json
+          seeds: string[]
+          started_at: string
+          status: string
+          trigger_source: string
+        }
+        Insert: {
+          discovered_count?: number
+          discovery_attempts?: number
+          error_message?: string | null
+          failed_count?: number
+          finished_at?: string | null
+          id?: string
+          refreshed_count?: number
+          result?: Json
+          seeds?: string[]
+          started_at?: string
+          status?: string
+          trigger_source?: string
+        }
+        Update: {
+          discovered_count?: number
+          discovery_attempts?: number
+          error_message?: string | null
+          failed_count?: number
+          finished_at?: string | null
+          id?: string
+          refreshed_count?: number
+          result?: Json
+          seeds?: string[]
+          started_at?: string
+          status?: string
+          trigger_source?: string
+        }
+        Relationships: []
+      }
+      campaign_podcasts: {
+        Row: {
+          actual_clicks: number | null
+          actual_conversions: number | null
+          actual_reach: number | null
+          actual_spend_rmb: number | null
+          brand_safety_notes: string | null
+          brand_safety_score: number | null
+          brand_safety_tags: string[]
+          campaign_id: string
+          competitor_brands: string[]
+          created_at: string
+          data_confidence: string
+          estimated_cpm_rmb: number | null
+          estimated_episodes: number | null
+          expected_reach: number | null
+          fit_reason: string | null
+          id: string
+          match_explanation: string | null
+          notes: string | null
+          outreach_status: string
+          pipeline_status: string
+          plan_label: string | null
+          podcast_id: string | null
+          pricing_basis: string | null
+          quoted_price_rmb: number | null
+          scheduled_date: string | null
+          suggested_price_max_rmb: number | null
+          suggested_price_min_rmb: number | null
+          sort_order: number | null
+          suggested_format: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          actual_clicks?: number | null
+          actual_conversions?: number | null
+          actual_reach?: number | null
+          actual_spend_rmb?: number | null
+          brand_safety_notes?: string | null
+          brand_safety_score?: number | null
+          brand_safety_tags?: string[]
+          campaign_id: string
+          competitor_brands?: string[]
+          created_at?: string
+          data_confidence?: string
+          estimated_cpm_rmb?: number | null
+          estimated_episodes?: number | null
+          expected_reach?: number | null
+          fit_reason?: string | null
+          id?: string
+          match_explanation?: string | null
+          notes?: string | null
+          outreach_status?: string
+          pipeline_status?: string
+          plan_label?: string | null
+          podcast_id?: string | null
+          pricing_basis?: string | null
+          quoted_price_rmb?: number | null
+          scheduled_date?: string | null
+          suggested_price_max_rmb?: number | null
+          suggested_price_min_rmb?: number | null
+          sort_order?: number | null
+          suggested_format?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          actual_clicks?: number | null
+          actual_conversions?: number | null
+          actual_reach?: number | null
+          actual_spend_rmb?: number | null
+          brand_safety_notes?: string | null
+          brand_safety_score?: number | null
+          brand_safety_tags?: string[]
+          campaign_id?: string
+          competitor_brands?: string[]
+          created_at?: string
+          data_confidence?: string
+          estimated_cpm_rmb?: number | null
+          estimated_episodes?: number | null
+          expected_reach?: number | null
+          fit_reason?: string | null
+          id?: string
+          match_explanation?: string | null
+          notes?: string | null
+          outreach_status?: string
+          pipeline_status?: string
+          plan_label?: string | null
+          podcast_id?: string | null
+          pricing_basis?: string | null
+          quoted_price_rmb?: number | null
+          scheduled_date?: string | null
+          suggested_price_max_rmb?: number | null
+          suggested_price_min_rmb?: number | null
+          sort_order?: number | null
+          suggested_format?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      competitor_campaigns: {
+        Row: {
+          ad_format: string | null
+          brand_category: string | null
+          brand_name: string
+          created_at: string
+          data_confidence: string
+          evidence_url: string | null
+          first_seen_at: string | null
+          id: string
+          last_seen_at: string | null
+          notes: string | null
+          podcast_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          ad_format?: string | null
+          brand_category?: string | null
+          brand_name: string
+          created_at?: string
+          data_confidence?: string
+          evidence_url?: string | null
+          first_seen_at?: string | null
+          id?: string
+          last_seen_at?: string | null
+          notes?: string | null
+          podcast_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ad_format?: string | null
+          brand_category?: string | null
+          brand_name?: string
+          created_at?: string
+          data_confidence?: string
+          evidence_url?: string | null
+          first_seen_at?: string | null
+          id?: string
+          last_seen_at?: string | null
+          notes?: string | null
+          podcast_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      creator_contacts: {
+        Row: {
+          contact_email: string | null
+          contact_name: string | null
+          created_at: string
+          id: string
+          last_contacted_at: string | null
+          notes: string | null
+          platform: string | null
+          podcast_id: string | null
+          profile_url: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          last_contacted_at?: string | null
+          notes?: string | null
+          platform?: string | null
+          podcast_id?: string | null
+          profile_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_name?: string | null
+          created_at?: string
+          id?: string
+          last_contacted_at?: string | null
+          notes?: string | null
+          platform?: string | null
+          podcast_id?: string | null
+          profile_url?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      creator_submissions: {
+        Row: {
+          ad_categories: string[]
+          authorized_metrics: Json
+          contact_email: string | null
+          contact_wechat: string | null
+          created_at: string
+          host_name: string | null
+          id: string
+          introduction: string | null
+          notes: string | null
+          podcast_name: string
+          podcast_url: string | null
+          quote_max_rmb: number | null
+          quote_min_rmb: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          ad_categories?: string[]
+          authorized_metrics?: Json
+          contact_email?: string | null
+          contact_wechat?: string | null
+          created_at?: string
+          host_name?: string | null
+          id?: string
+          introduction?: string | null
+          notes?: string | null
+          podcast_name: string
+          podcast_url?: string | null
+          quote_max_rmb?: number | null
+          quote_min_rmb?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          ad_categories?: string[]
+          authorized_metrics?: Json
+          contact_email?: string | null
+          contact_wechat?: string | null
+          created_at?: string
+          host_name?: string | null
+          id?: string
+          introduction?: string | null
+          notes?: string | null
+          podcast_name?: string
+          podcast_url?: string | null
+          quote_max_rmb?: number | null
+          quote_min_rmb?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       episodes: {
         Row: {
           audio_url: string | null
@@ -129,6 +510,102 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      podcast_ad_profiles: {
+        Row: {
+          ad_categories: string[]
+          brand_safety_notes: string | null
+          brand_safety_score: number
+          brand_safety_tags: string[]
+          collaboration_status: string
+          contact_email: string | null
+          contact_method: string | null
+          contact_wechat: string | null
+          created_at: string
+          data_confidence: string
+          historical_brands: string[]
+          host_read_max_rmb: number | null
+          host_read_min_rmb: number | null
+          id: string
+          manually_confirmed_at: string | null
+          notes: string | null
+          podcast_id: string
+          pricing_basis: string | null
+          quote_max_rmb: number | null
+          quote_min_rmb: number | null
+          response_rate: number | null
+          source_notes: string | null
+          custom_episode_max_rmb: number | null
+          custom_episode_min_rmb: number | null
+          sponsorship_max_rmb: number | null
+          sponsorship_min_rmb: number | null
+          suggested_price_max_rmb: number | null
+          suggested_price_min_rmb: number | null
+          updated_at: string
+        }
+        Insert: {
+          ad_categories?: string[]
+          brand_safety_notes?: string | null
+          brand_safety_score?: number
+          brand_safety_tags?: string[]
+          collaboration_status?: string
+          contact_email?: string | null
+          contact_method?: string | null
+          contact_wechat?: string | null
+          created_at?: string
+          data_confidence?: string
+          historical_brands?: string[]
+          host_read_max_rmb?: number | null
+          host_read_min_rmb?: number | null
+          id?: string
+          manually_confirmed_at?: string | null
+          notes?: string | null
+          podcast_id: string
+          pricing_basis?: string | null
+          quote_max_rmb?: number | null
+          quote_min_rmb?: number | null
+          response_rate?: number | null
+          source_notes?: string | null
+          custom_episode_max_rmb?: number | null
+          custom_episode_min_rmb?: number | null
+          sponsorship_max_rmb?: number | null
+          sponsorship_min_rmb?: number | null
+          suggested_price_max_rmb?: number | null
+          suggested_price_min_rmb?: number | null
+          updated_at?: string
+        }
+        Update: {
+          ad_categories?: string[]
+          brand_safety_notes?: string | null
+          brand_safety_score?: number
+          brand_safety_tags?: string[]
+          collaboration_status?: string
+          contact_email?: string | null
+          contact_method?: string | null
+          contact_wechat?: string | null
+          created_at?: string
+          data_confidence?: string
+          historical_brands?: string[]
+          host_read_max_rmb?: number | null
+          host_read_min_rmb?: number | null
+          id?: string
+          manually_confirmed_at?: string | null
+          notes?: string | null
+          podcast_id?: string
+          pricing_basis?: string | null
+          quote_max_rmb?: number | null
+          quote_min_rmb?: number | null
+          response_rate?: number | null
+          source_notes?: string | null
+          custom_episode_max_rmb?: number | null
+          custom_episode_min_rmb?: number | null
+          sponsorship_max_rmb?: number | null
+          sponsorship_min_rmb?: number | null
+          suggested_price_max_rmb?: number | null
+          suggested_price_min_rmb?: number | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       podcasts: {
         Row: {

@@ -75,7 +75,11 @@ function normalizeImageUrl(value: unknown): string | null {
   if (typeof value === "string") return value.trim() || null;
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>;
-    return readTextValue(record.href ?? record.url ?? record.link ?? record["@_href"] ?? record["@_url"]) || null;
+    return (
+      readTextValue(
+        record.href ?? record.url ?? record.link ?? record["@_href"] ?? record["@_url"],
+      ) || null
+    );
   }
   return null;
 }
@@ -107,6 +111,26 @@ function mapRss2JsonFeed(payload: Rss2JsonPayload) {
       })),
     },
   };
+}
+
+function extractXimalayaAlbumId(value: string) {
+  return value.match(/ximalaya\.com\/(?:album|podcast)\/(\d+)/i)?.[1] ?? null;
+}
+
+function extractPlatformUrlsFromText(text: string) {
+  const xiaoyuzhouMatch = text.match(/https?:\/\/www\.xiaoyuzhoufm\.com\/podcast\/[a-z0-9]+/i);
+  const ximalayaId = extractXimalayaAlbumId(text);
+  return {
+    xiaoyuzhouUrl: xiaoyuzhouMatch?.[0]?.replace(/^http:/i, "https:") ?? null,
+    ximalayaUrl: ximalayaId ? `https://www.ximalaya.com/album/${ximalayaId}` : null,
+  };
+}
+
+function mergePlatformUrls(...values: Array<unknown>) {
+  const combined = values
+    .map((value) => (typeof value === "string" ? value : value == null ? "" : JSON.stringify(value)))
+    .join("\n");
+  return extractPlatformUrlsFromText(combined);
 }
 
 async function fetchRssContent(rssUrl: string): Promise<FetchRssResult> {
@@ -188,9 +212,10 @@ async function fetchRssContent(rssUrl: string): Promise<FetchRssResult> {
 
       let xml = "";
       if (attempt.mode === "allorigins") {
-        const payload = (await res.json().catch(() => null)) as
-          | { contents?: string; status?: { http_code?: number } }
-          | null;
+        const payload = (await res.json().catch(() => null)) as {
+          contents?: string;
+          status?: { http_code?: number };
+        } | null;
         xml = payload?.contents?.trim() ?? "";
         if (!xml && payload?.status?.http_code) {
           lastStatus = payload.status.http_code;
@@ -273,7 +298,10 @@ function deriveTags(channel: Record<string, unknown>, episodes: { title: string 
     const t = (c as { "@_text"?: string })?.["@_text"];
     if (t) tags.add(t);
   }
-  const text = episodes.map((e) => e.title).join(" ").toLowerCase();
+  const text = episodes
+    .map((e) => e.title)
+    .join(" ")
+    .toLowerCase();
   const dict: Record<string, string> = {
     商业: "商业财经",
     创业: "创业投资",
@@ -369,9 +397,7 @@ export const ingestPodcast = createServerFn({ method: "POST" })
 
     try {
       const doc =
-        rssFetch.format === "xml"
-          ? parser.parse(rssFetch.xml)
-          : mapRss2JsonFeed(rssFetch.payload);
+        rssFetch.format === "xml" ? parser.parse(rssFetch.xml) : mapRss2JsonFeed(rssFetch.payload);
       const channel = doc?.rss?.channel ?? doc?.feed;
       if (!channel) {
         return {
@@ -395,8 +421,7 @@ export const ingestPodcast = createServerFn({ method: "POST" })
         null;
       const language = String(channel.language ?? "zh-cn");
       const cats = asArray(channel["itunes:category"] as unknown);
-      const category =
-        (cats[0] as { "@_text"?: string })?.["@_text"] ?? null;
+      const category = (cats[0] as { "@_text"?: string })?.["@_text"] ?? null;
 
       const items = asArray(channel.item ?? channel.entry);
       const episodes = items
@@ -405,9 +430,13 @@ export const ingestPodcast = createServerFn({ method: "POST" })
           const d = pub ? new Date(String(pub)) : null;
           const enclosure = it.enclosure as { "@_url"?: string } | undefined;
           return {
-            guid: String((it.guid as { "#text"?: string })?.["#text"] ?? it.guid ?? it.id ?? "") || null,
+            guid:
+              String((it.guid as { "#text"?: string })?.["#text"] ?? it.guid ?? it.id ?? "") ||
+              null,
             title: String(it.title ?? "").trim(),
-            description: String(it.description ?? it.summary ?? "").trim().slice(0, 2000),
+            description: String(it.description ?? it.summary ?? "")
+              .trim()
+              .slice(0, 2000),
             pub_date: d && !isNaN(d.getTime()) ? d.toISOString() : null,
             duration_seconds: parseDuration(it["itunes:duration"]),
             audio_url: enclosure?.["@_url"] ?? null,
@@ -416,9 +445,9 @@ export const ingestPodcast = createServerFn({ method: "POST" })
         .filter((e) => e.title);
 
       const sortedDates = episodes
-      .map((e) => (e.pub_date ? new Date(e.pub_date).getTime() : null))
-      .filter((x): x is number => x != null)
-      .sort((a, b) => b - a);
+        .map((e) => (e.pub_date ? new Date(e.pub_date).getTime() : null))
+        .filter((x): x is number => x != null)
+        .sort((a, b) => b - a);
 
       const latest = sortedDates[0] ?? null;
       const first = sortedDates[sortedDates.length - 1] ?? null;
@@ -430,13 +459,12 @@ export const ingestPodcast = createServerFn({ method: "POST" })
         for (let i = 0; i < Math.min(sortedDates.length - 1, 20); i++) {
           gaps.push((sortedDates[i] - sortedDates[i + 1]) / 86400000);
         }
-        updateFreqDays =
-          Math.round((gaps.reduce((a, b) => a + b, 0) / gaps.length) * 10) / 10;
+        updateFreqDays = Math.round((gaps.reduce((a, b) => a + b, 0) / gaps.length) * 10) / 10;
       }
 
       const durations = episodes
-      .map((e) => e.duration_seconds)
-      .filter((x): x is number => x != null && x > 0);
+        .map((e) => e.duration_seconds)
+        .filter((x): x is number => x != null && x > 0);
       const avgDurationMin = durations.length
         ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length / 60)
         : null;
@@ -445,6 +473,13 @@ export const ingestPodcast = createServerFn({ method: "POST" })
       if (!apple && title) apple = await lookupAppleByTitle(title);
       const itunesId = apple?.collectionId ? String(apple.collectionId) : null;
       const itunesUrl = (apple?.collectionViewUrl as string | undefined) ?? null;
+      const platformUrls = mergePlatformUrls(
+        rssUrl,
+        rssFetch.format === "xml" ? rssFetch.xml : rssFetch.payload,
+        channel.link,
+        description,
+        itunesUrl,
+      );
 
       const tags = deriveTags(channel, episodes);
       const scores = scorePodcast({
@@ -456,35 +491,37 @@ export const ingestPodcast = createServerFn({ method: "POST" })
       });
 
       const upsertRow = {
-      rss_url: rssUrl,
-      title,
-      author,
-      description: description.slice(0, 2000),
-      image_url: image,
-      itunes_id: itunesId,
-      itunes_url: itunesUrl,
-      category,
-      language,
-      market,
-      latest_episode_at: latest ? new Date(latest).toISOString() : null,
-      first_episode_at: first ? new Date(first).toISOString() : null,
-      episode_count: episodes.length,
-      update_frequency_days: updateFreqDays,
-      avg_duration_minutes: avgDurationMin,
-      commercial_score: scores.commercial,
-      activity_score: scores.activity,
-      growth_score: scores.growth,
-      lifecycle_stage: scores.lifecycle,
-      audience_tags: tags,
-      last_synced_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+        rss_url: rssUrl,
+        title,
+        author,
+        description: description.slice(0, 2000),
+        image_url: image,
+        itunes_id: itunesId,
+        itunes_url: itunesUrl,
+        ...(platformUrls.xiaoyuzhouUrl ? { xiaoyuzhou_url: platformUrls.xiaoyuzhouUrl } : {}),
+        ...(platformUrls.ximalayaUrl ? { ximalaya_url: platformUrls.ximalayaUrl } : {}),
+        category,
+        language,
+        market,
+        latest_episode_at: latest ? new Date(latest).toISOString() : null,
+        first_episode_at: first ? new Date(first).toISOString() : null,
+        episode_count: episodes.length,
+        update_frequency_days: updateFreqDays,
+        avg_duration_minutes: avgDurationMin,
+        commercial_score: scores.commercial,
+        activity_score: scores.activity,
+        growth_score: scores.growth,
+        lifecycle_stage: scores.lifecycle,
+        audience_tags: tags,
+        last_synced_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
       const { data: pod, error } = await supabaseAdmin
-      .from("podcasts")
-      .upsert(upsertRow, { onConflict: "rss_url" })
-      .select("*")
-      .single();
+        .from("podcasts")
+        .upsert(upsertRow, { onConflict: "rss_url" })
+        .select("*")
+        .single();
       if (error) throw new Error(error.message);
 
       const epRows = episodes.slice(0, 100).map((e) => ({
@@ -497,12 +534,11 @@ export const ingestPodcast = createServerFn({ method: "POST" })
         audio_url: e.audio_url,
       }));
       if (epRows.length) {
-        await supabaseAdmin
-          .from("episodes")
-          .upsert(epRows, { onConflict: "podcast_id,guid" });
+        await supabaseAdmin.from("episodes").upsert(epRows, { onConflict: "podcast_id,guid" });
       }
 
-      const xySubs = (pod as { xiaoyuzhou_subscribers?: number | null }).xiaoyuzhou_subscribers ?? null;
+      const xySubs =
+        (pod as { xiaoyuzhou_subscribers?: number | null }).xiaoyuzhou_subscribers ?? null;
       const xmPlays = (pod as { ximalaya_plays?: number | null }).ximalaya_plays ?? null;
       let dailyDelta: number | null = null;
       if (xmPlays != null) {
@@ -515,10 +551,7 @@ export const ingestPodcast = createServerFn({ method: "POST" })
           .limit(1)
           .maybeSingle();
         if (prev?.ximalaya_plays != null && prev.taken_at) {
-          const days = Math.max(
-            1,
-            (Date.now() - new Date(prev.taken_at).getTime()) / 86400000,
-          );
+          const days = Math.max(1, (Date.now() - new Date(prev.taken_at).getTime()) / 86400000);
           dailyDelta = Math.round(Math.max(0, xmPlays - prev.ximalaya_plays) / days);
         }
       }
@@ -580,12 +613,21 @@ export const listPodcasts = createServerFn({ method: "POST" })
 
     const MAX_TOTAL = 100000;
     const PAGE = 1000;
-    const all: any[] = [];
+    type PodcastListRow = {
+      id: string;
+      xiaoyuzhou_subscribers: number | null;
+      ximalaya_subscribers: number | null;
+      apple_subscribers: number | null;
+      monthly_active_listeners: number | null;
+      ximalaya_plays: number | null;
+      [key: string]: unknown;
+    };
+    const all: PodcastListRow[] = [];
     for (let from = 0; from < MAX_TOTAL; from += PAGE) {
     let q = supabaseAdmin
         .from("podcasts")
         .select(
-          "id,title,author,image_url,category,episode_count,latest_episode_at,update_frequency_days,commercial_score,activity_score,growth_score,lifecycle_stage,audience_tags,market,xiaoyuzhou_subscribers,ximalaya_plays,ximalaya_subscribers,apple_subscribers",
+          "id,title,author,image_url,category,episode_count,latest_episode_at,update_frequency_days,commercial_score,activity_score,growth_score,lifecycle_stage,audience_tags,market,xiaoyuzhou_subscribers,ximalaya_subscribers,apple_subscribers,monthly_active_listeners,ximalaya_plays",
         )
         .eq("market", market)
         .order("commercial_score", { ascending: false })
@@ -598,54 +640,481 @@ export const listPodcasts = createServerFn({ method: "POST" })
       all.push(...rows);
       if (rows.length < PAGE) break;
     }
-    return { podcasts: all };
+
+    const latestSnapshots = new Map<
+      string,
+      {
+        estimated_subscribers: number | null;
+        estimated_reviews: number | null;
+        taken_at: string | null;
+      }
+    >();
+    const ids = all.map((p) => p.id).filter(Boolean);
+    for (let i = 0; i < ids.length; i += 500) {
+      const chunk = ids.slice(i, i + 500);
+      const { data: snapshots, error } = await supabaseAdmin
+        .from("snapshots")
+        .select("podcast_id,estimated_subscribers,estimated_reviews,taken_at")
+        .in("podcast_id", chunk)
+        .order("taken_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      for (const snapshot of snapshots ?? []) {
+        if (!snapshot.podcast_id || latestSnapshots.has(snapshot.podcast_id)) continue;
+        latestSnapshots.set(snapshot.podcast_id, {
+          estimated_subscribers: snapshot.estimated_subscribers ?? null,
+          estimated_reviews: snapshot.estimated_reviews ?? null,
+          taken_at: snapshot.taken_at ?? null,
+        });
+      }
+    }
+
+    const withSubscriberCounts = all.map((p) => {
+      const snapshot = latestSnapshots.get(p.id);
+      const subscriberCount =
+        p.xiaoyuzhou_subscribers ??
+        p.ximalaya_subscribers ??
+        p.apple_subscribers ??
+        p.monthly_active_listeners ??
+        snapshot?.estimated_subscribers ??
+        null;
+      const subscriberSource =
+        p.xiaoyuzhou_subscribers != null
+          ? "小宇宙"
+          : p.ximalaya_subscribers != null
+            ? "喜马拉雅"
+            : p.apple_subscribers != null
+              ? "Apple"
+              : p.monthly_active_listeners != null
+                ? "人工登记"
+                : snapshot?.estimated_subscribers != null
+                  ? "估算"
+                  : null;
+      return {
+        ...p,
+        estimated_subscribers: snapshot?.estimated_subscribers ?? null,
+        estimated_reviews: snapshot?.estimated_reviews ?? null,
+        subscriber_count: subscriberCount,
+        subscriber_source: subscriberSource,
+        subscriber_snapshot_at: snapshot?.taken_at ?? null,
+      };
+    });
+    return { podcasts: withSubscriberCounts };
   });
 
-export const listBrandCategories = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const { data, error } = await supabaseAdmin
-      .from("brand_recommendations")
-      .select("category")
-      .not("category", "is", null)
-      .limit(500);
-    if (error) throw new Error(error.message);
-    const counts = new Map<string, number>();
-    for (const r of data ?? []) {
-      const c = (r.category ?? "").trim();
-      if (!c) continue;
-      counts.set(c, (counts.get(c) ?? 0) + 1);
+export const listBrandCategories = createServerFn({ method: "GET" }).handler(async () => {
+  const { data, error } = await supabaseAdmin
+    .from("brand_recommendations")
+    .select("category")
+    .not("category", "is", null)
+    .limit(500);
+  if (error) throw new Error(error.message);
+  const counts = new Map<string, number>();
+  for (const r of data ?? []) {
+    const c = (r.category ?? "").trim();
+    if (!c) continue;
+    counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  const categories = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 24)
+    .map(([name, count]) => ({ name, count }));
+  return { categories };
+});
+
+type OutreachWindow = {
+  days: 7 | 14 | 30;
+  subscriber_delta: number | null;
+  subscriber_growth_pct: number | null;
+  play_delta: number | null;
+  episode_delta: number | null;
+};
+
+type OutreachOpportunity = {
+  id: string;
+  title: string | null;
+  author: string | null;
+  image_url: string | null;
+  category: string | null;
+  platform: "小宇宙" | "喜马拉雅" | "多平台" | "其他";
+  platform_url: string | null;
+  subscriber_count: number | null;
+  ximalaya_plays: number | null;
+  commercial_score: number;
+  activity_score: number;
+  growth_score: number;
+  update_frequency_days: number | null;
+  latest_episode_at: string | null;
+  windows: OutreachWindow[];
+  snapshot_count: number;
+  last_snapshot_at: string | null;
+  data_freshness_days: number | null;
+  quality_score: number;
+  performance_score: number;
+  momentum_score: number;
+  signal_level: "强信号" | "中信号" | "观察信号";
+  outreach_priority: "高" | "中" | "观察";
+  reason: string;
+  suggested_action: string;
+  evidence: string[];
+};
+
+function numberOrNull(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function pct(delta: number | null, base: number | null) {
+  if (delta == null || base == null || base <= 0) return null;
+  return Math.round((delta / base) * 1000) / 10;
+}
+
+function clampScore(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function daysSince(iso: string | null) {
+  if (!iso) return 999;
+  return Math.max(0, (Date.now() - new Date(iso).getTime()) / 86400000);
+}
+
+function fmtSignedCount(value: number | null) {
+  if (value == null) return null;
+  if (value >= 10000) return `+${(value / 10000).toFixed(1)}万`;
+  return `+${value.toLocaleString()}`;
+}
+
+function w14Text(windows: OutreachWindow[]) {
+  const w14 = windows.find((w) => w.days === 14);
+  if (!w14) return null;
+  if (w14.subscriber_delta != null) return `14天订阅 ${fmtSignedCount(w14.subscriber_delta)}`;
+  if (w14.play_delta != null) return `14天播放 ${fmtSignedCount(w14.play_delta)}`;
+  return null;
+}
+
+export async function buildOutreachOpportunities() {
+  const { data: latestRun, error: latestRunError } = await supabaseAdmin
+    .from("daily_refresh_runs")
+    .select(
+      "id,started_at,finished_at,status,trigger_source,discovered_count,discovery_attempts,refreshed_count,failed_count,error_message",
+    )
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const refreshRun = latestRunError ? null : latestRun;
+
+  const { data: topCommercialPods, error: commercialError } = await supabaseAdmin
+    .from("podcasts")
+    .select(
+      "id,title,author,image_url,category,episode_count,latest_episode_at,update_frequency_days,commercial_score,activity_score,growth_score,audience_tags,market,xiaoyuzhou_url,xiaoyuzhou_subscribers,ximalaya_url,ximalaya_subscribers,ximalaya_plays",
+    )
+    .eq("market", "cn")
+    .order("commercial_score", { ascending: false })
+    .limit(300);
+  if (commercialError) throw new Error(commercialError.message);
+
+  const { data: topGrowthPods, error: growthError } = await supabaseAdmin
+    .from("podcasts")
+    .select(
+      "id,title,author,image_url,category,episode_count,latest_episode_at,update_frequency_days,commercial_score,activity_score,growth_score,audience_tags,market,xiaoyuzhou_url,xiaoyuzhou_subscribers,ximalaya_url,ximalaya_subscribers,ximalaya_plays",
+    )
+    .eq("market", "cn")
+    .order("growth_score", { ascending: false })
+    .limit(300);
+  if (growthError) throw new Error(growthError.message);
+
+  const { data: topSubscriberPods, error: subscriberError } = await supabaseAdmin
+    .from("podcasts")
+    .select(
+      "id,title,author,image_url,category,episode_count,latest_episode_at,update_frequency_days,commercial_score,activity_score,growth_score,audience_tags,market,xiaoyuzhou_url,xiaoyuzhou_subscribers,ximalaya_url,ximalaya_subscribers,ximalaya_plays",
+    )
+    .eq("market", "cn")
+    .order("xiaoyuzhou_subscribers", { ascending: false, nullsFirst: false })
+    .limit(300);
+  if (subscriberError) throw new Error(subscriberError.message);
+
+  const pods = Array.from(
+    new Map(
+      [...(topCommercialPods ?? []), ...(topGrowthPods ?? []), ...(topSubscriberPods ?? [])].map((p) => [
+        p.id,
+        p,
+      ]),
+    ).values(),
+  ).slice(0, 700);
+
+  const ids = (pods ?? []).map((p) => p.id).filter(Boolean);
+  const since = new Date(Date.now() - 31 * 86400000).toISOString();
+  const snapshotsByPodcast = new Map<
+    string,
+    Array<{
+      taken_at: string;
+      episode_count: number | null;
+      estimated_subscribers: number | null;
+      xiaoyuzhou_subscribers: number | null;
+      ximalaya_plays: number | null;
+    }>
+  >();
+
+  for (let i = 0; i < ids.length; i += 500) {
+    const { data: snaps, error: snapError } = await supabaseAdmin
+      .from("snapshots")
+      .select("podcast_id,taken_at,episode_count,estimated_subscribers,xiaoyuzhou_subscribers,ximalaya_plays")
+      .in("podcast_id", ids.slice(i, i + 500))
+      .gte("taken_at", since)
+      .order("taken_at", { ascending: true });
+    if (snapError) {
+      console.warn("[outreach-opportunities] snapshots unavailable", snapError.message);
+      continue;
     }
-    const categories = Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 24)
-      .map(([name, count]) => ({ name, count }));
-    return { categories };
-  },
+    for (const snap of snaps ?? []) {
+      const list = snapshotsByPodcast.get(snap.podcast_id) ?? [];
+      list.push({
+        taken_at: snap.taken_at,
+        episode_count: snap.episode_count ?? null,
+        estimated_subscribers: snap.estimated_subscribers ?? null,
+        xiaoyuzhou_subscribers: snap.xiaoyuzhou_subscribers ?? null,
+        ximalaya_plays: snap.ximalaya_plays ?? null,
+      });
+      snapshotsByPodcast.set(snap.podcast_id, list);
+    }
+  }
+
+  const opportunities: OutreachOpportunity[] = (pods ?? []).map((p) => {
+    const snapshots = snapshotsByPodcast.get(p.id) ?? [];
+    const latestSnapshot = snapshots.at(-1) ?? null;
+    const currentSubscribers =
+      numberOrNull(p.xiaoyuzhou_subscribers) ??
+      numberOrNull(p.ximalaya_subscribers) ??
+      latestSnapshot?.estimated_subscribers ??
+      null;
+    const currentPlays = numberOrNull(p.ximalaya_plays) ?? latestSnapshot?.ximalaya_plays ?? null;
+    const currentEpisodes = numberOrNull(p.episode_count);
+    const dataFreshnessDays = latestSnapshot?.taken_at
+      ? Math.round(daysSince(latestSnapshot.taken_at))
+      : null;
+    const hasCurrentPlatformMetric =
+      currentSubscribers != null || currentPlays != null || currentEpisodes != null;
+
+    const snapshotForWindow = (days: 7 | 14 | 30) => {
+      const cutoff = Date.now() - days * 86400000;
+      return (
+        [...snapshots]
+          .reverse()
+          .find((s) => new Date(s.taken_at).getTime() <= cutoff) ??
+        snapshots[0] ??
+        null
+      );
+    };
+
+    const windows: OutreachWindow[] = ([7, 14, 30] as const).map((days) => {
+      const base = snapshotForWindow(days);
+      const baseSubscribers =
+        base?.xiaoyuzhou_subscribers ?? base?.estimated_subscribers ?? currentSubscribers;
+      const subscriberDelta =
+        currentSubscribers != null && baseSubscribers != null
+          ? Math.max(0, currentSubscribers - baseSubscribers)
+          : null;
+      const playDelta =
+        currentPlays != null && base?.ximalaya_plays != null
+          ? Math.max(0, currentPlays - base.ximalaya_plays)
+          : null;
+      const episodeDelta =
+        currentEpisodes != null && base?.episode_count != null
+          ? Math.max(0, currentEpisodes - base.episode_count)
+          : null;
+      return {
+        days,
+        subscriber_delta: subscriberDelta,
+        subscriber_growth_pct: pct(subscriberDelta, baseSubscribers),
+        play_delta: playDelta,
+        episode_delta: episodeDelta,
+      };
+    });
+
+    const w7 = windows[0];
+    const w30 = windows[2];
+    const recentActivity =
+      Math.max(0, 30 - daysSince(p.latest_episode_at ?? null)) +
+      Math.max(0, 14 - (p.update_frequency_days ?? 14));
+    const subscriberScale = Math.min(28, Math.log10(Math.max(currentSubscribers ?? 1, 1)) * 5);
+    const playScale = Math.min(18, Math.log10(Math.max(currentPlays ?? 1, 1)) * 2.5);
+    const growthVelocity =
+      Math.min(26, (w7.subscriber_growth_pct ?? 0) * 4) +
+      Math.min(18, (w30.subscriber_growth_pct ?? 0) * 1.6) +
+      Math.min(16, Math.log10(Math.max((w30.play_delta ?? 0) + 1, 1)) * 3) +
+      Math.min(14, (w30.episode_delta ?? 0) * 3);
+    const performanceScore = clampScore(
+      (p.commercial_score ?? 50) * 0.35 +
+        (p.activity_score ?? 50) * 0.2 +
+        (p.growth_score ?? 50) * 0.15 +
+        subscriberScale +
+        playScale +
+        recentActivity * 0.5,
+    );
+    const momentumScore = clampScore(
+      (p.growth_score ?? 50) * 0.25 +
+        (p.activity_score ?? 50) * 0.2 +
+        growthVelocity +
+        recentActivity,
+    );
+    const hasRecentSnapshot = dataFreshnessDays != null && dataFreshnessDays <= 8;
+    const updateCadenceScore = clampScore(100 - Math.min(80, (p.update_frequency_days ?? 21) * 4));
+    const qualityScore = clampScore(
+      performanceScore * 0.42 +
+        momentumScore * 0.28 +
+        (p.commercial_score ?? 50) * 0.18 +
+        updateCadenceScore * 0.12 +
+        (hasRecentSnapshot ? 6 : hasCurrentPlatformMetric ? 0 : -8),
+    );
+    const platform =
+      p.xiaoyuzhou_url && p.ximalaya_url
+        ? "多平台"
+        : p.xiaoyuzhou_url
+          ? "小宇宙"
+          : p.ximalaya_url
+            ? "喜马拉雅"
+            : "其他";
+    const platformUrl = p.xiaoyuzhou_url ?? p.ximalaya_url ?? null;
+    const priorityScore = Math.max(qualityScore, performanceScore, momentumScore);
+    const outreachPriority = priorityScore >= 78 ? "高" : priorityScore >= 62 ? "中" : "观察";
+    const signalLevel =
+      priorityScore >= 78 && snapshots.length >= 2
+        ? "强信号"
+        : priorityScore >= 62
+          ? "中信号"
+          : "观察信号";
+    const growthText =
+      w7.subscriber_growth_pct != null
+        ? `7天订阅增长 ${w7.subscriber_growth_pct}%`
+        : w30.play_delta != null
+          ? `30天播放增长 ${w30.play_delta.toLocaleString()}`
+          : `近30天更新 ${w30.episode_delta ?? 0} 集`;
+    const evidence = [
+      currentSubscribers != null ? `订阅 ${currentSubscribers.toLocaleString()}` : null,
+      w7.subscriber_delta != null ? `7天订阅 ${fmtSignedCount(w7.subscriber_delta)}` : null,
+      w14Text(windows),
+      w30.play_delta != null ? `30天播放 ${fmtSignedCount(w30.play_delta)}` : null,
+      w30.episode_delta != null ? `30天更新 +${w30.episode_delta} 集` : null,
+      p.update_frequency_days != null ? `约 ${p.update_frequency_days} 天/更` : null,
+      dataFreshnessDays != null ? `数据 ${dataFreshnessDays} 天前` : "当前平台数据",
+    ].filter(Boolean) as string[];
+
+    return {
+      id: p.id,
+      title: p.title ?? null,
+      author: p.author ?? null,
+      image_url: p.image_url ?? null,
+      category: p.category ?? null,
+      platform,
+      platform_url: platformUrl,
+      subscriber_count: currentSubscribers,
+      ximalaya_plays: currentPlays,
+      commercial_score: p.commercial_score ?? 0,
+      activity_score: p.activity_score ?? 0,
+      growth_score: p.growth_score ?? 0,
+      update_frequency_days: p.update_frequency_days ?? null,
+      latest_episode_at: p.latest_episode_at ?? null,
+      windows,
+      snapshot_count: snapshots.length,
+      last_snapshot_at: latestSnapshot?.taken_at ?? null,
+      data_freshness_days: dataFreshnessDays,
+      quality_score: qualityScore,
+      performance_score: performanceScore,
+      momentum_score: momentumScore,
+      signal_level: signalLevel,
+      outreach_priority: outreachPriority,
+      reason:
+        qualityScore >= 78
+          ? `综合质量高，${growthText}，适合优先询价建联`
+          : performanceScore >= momentumScore
+            ? `存量表现强，${growthText}，适合优先询价建联`
+            : `增长势头较好，${growthText}，适合进入观察和试投池`,
+      suggested_action:
+        outreachPriority === "高"
+          ? "本周优先建联，索要刊例、档期和历史转化案例"
+          : outreachPriority === "中"
+            ? "加入候选池，先询价并安排小预算测试"
+            : "继续观察 7-14 天，等待增长或更新信号更明确",
+      evidence,
+    };
+  });
+
+  const topPerformance = [...opportunities]
+    .sort((a, b) => b.performance_score - a.performance_score)
+    .slice(0, 12);
+  const promising = [...opportunities]
+    .sort((a, b) => b.momentum_score - a.momentum_score)
+    .slice(0, 12);
+  const suggestedOutreach = [...new Map([...topPerformance, ...promising].map((p) => [p.id, p])).values()]
+    .sort((a, b) => {
+      const priority = { 高: 2, 中: 1, 观察: 0 };
+      return (
+        priority[b.outreach_priority] - priority[a.outreach_priority] ||
+        Math.max(b.performance_score, b.momentum_score) - Math.max(a.performance_score, a.momentum_score)
+      );
+    })
+    .slice(0, 18);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    windows: [7, 14, 30],
+    latestRun: refreshRun ?? null,
+    topPerformance,
+    promising,
+    suggestedOutreach,
+  };
+}
+
+export const listOutreachOpportunities = createServerFn({ method: "GET" }).handler(
+  buildOutreachOpportunities,
 );
 
 export const getPodcastDetail = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data }) => {
-    const [podRes, epRes, snapRes] = await Promise.all([
+    const [podRes, epRes, snapRes, contactRes, adProfileRes, competitorsRes, evidenceRes] = await Promise.all([
       supabaseAdmin.from("podcasts").select("*").eq("id", data.id).single(),
       supabaseAdmin
         .from("episodes")
-        .select("id,title,pub_date,duration_seconds")
+        .select("id,guid,title,description,pub_date,duration_seconds,audio_url")
         .eq("podcast_id", data.id)
         .order("pub_date", { ascending: false })
         .limit(50),
       supabaseAdmin
         .from("snapshots")
-        .select("taken_at,episode_count,estimated_reviews,estimated_subscribers,xiaoyuzhou_subscribers,ximalaya_plays,daily_play_delta")
+        .select(
+          "taken_at,episode_count,estimated_reviews,estimated_subscribers,xiaoyuzhou_subscribers,ximalaya_plays,daily_play_delta",
+        )
         .eq("podcast_id", data.id)
         .order("taken_at", { ascending: true })
         .limit(60),
+      supabaseAdmin
+        .from("creator_contacts")
+        .select("id,platform,profile_url,contact_name,contact_email,status,notes,updated_at")
+        .eq("podcast_id", data.id)
+        .order("updated_at", { ascending: false })
+        .limit(20),
+      supabaseAdmin.from("podcast_ad_profiles").select("*").eq("podcast_id", data.id).maybeSingle(),
+      supabaseAdmin
+        .from("competitor_campaigns")
+        .select("*")
+        .eq("podcast_id", data.id)
+        .order("last_seen_at", { ascending: false })
+        .limit(20),
+      (supabaseAdmin as never as { from: (table: string) => ReturnType<typeof supabaseAdmin.from> })
+        .from("podcast_source_evidence")
+        .select("*")
+        .eq("podcast_id", data.id)
+        .order("captured_at", { ascending: false })
+        .limit(30),
     ]);
     if (podRes.error) throw new Error(podRes.error.message);
     return {
       podcast: podRes.data,
       episodes: epRes.data ?? [],
       snapshots: snapRes.data ?? [],
+      contacts: contactRes.data ?? [],
+      adProfile: adProfileRes.error ? null : (adProfileRes.data ?? null),
+      competitors: competitorsRes.data ?? [],
+      evidence: evidenceRes.error ? [] : (evidenceRes.data ?? []),
     };
   });
 

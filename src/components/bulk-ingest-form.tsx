@@ -2,10 +2,7 @@ import { useState, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import * as XLSX from "xlsx";
 import { ingestPodcast, searchPodcasts } from "@/lib/podcast.functions";
-import {
-  ingestFromPlatformUrl,
-  searchPodcastsAllPlatforms,
-} from "@/lib/insights.functions";
+import { ingestFromPlatformUrl, searchPodcastsAllPlatforms } from "@/lib/insights.functions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
@@ -140,16 +137,14 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
           continue;
         }
 
-        // Case 3: podcast name — prioritize XYZ/XMLY (CN), Apple is last fallback
+        // Case 3: podcast name — CN inventory should prefer Xiaoyuzhou / Ximalaya.
         if (market === "cn") {
-          const all = await searchAll({ data: { query: entry, market, limit: 5 } });
-          const hit =
-            all.results.find((r) => r.platform === "xiaoyuzhou") ??
-            all.results.find((r) => r.platform === "ximalaya");
+          const all = await searchAll({ data: { query: entry, market, limit: 8 } });
+          const hit = all.results.find(
+            (r) => r.platform === "xiaoyuzhou" || r.platform === "ximalaya",
+          );
           if (hit) {
-            markResolved(
-              `${hit.platform === "xiaoyuzhou" ? "小宇宙" : "喜马拉雅"} → ${hit.url}`,
-            );
+            markResolved(`${hit.platform === "xiaoyuzhou" ? "小宇宙" : "喜马拉雅"} → ${hit.url}`);
             const res = await ingestPlatform({ data: { url: hit.url, market } });
             if (res.ok === false) markFail(res.error);
             else markOk();
@@ -158,7 +153,7 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
           }
         }
 
-        // Apple Podcasts fallback
+        // Fallback: Apple Podcasts / RSS metadata
         const apple = await searchApple({ data: { query: entry, market, limit: 1 } });
         if (apple.ok && apple.results.length > 0) {
           const feedUrl = apple.results[0].feedUrl;
@@ -170,7 +165,11 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
           continue;
         }
 
-        markFail(market === "na" ? "No match found" : "小宇宙/喜马拉雅/Apple 均未找到匹配");
+        markFail(
+          market === "na"
+            ? "No match found"
+            : "未找到可信匹配；已优先查本地小宇宙/喜马拉雅来源和喜马拉雅平台搜索，Apple/RSS 作为补充",
+        );
       } catch (err) {
         markFail(err instanceof Error ? err.message : "Failed");
       }
@@ -193,7 +192,7 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
     <div className="space-y-3">
       <Tabs defaultValue="paste">
         <TabsList>
-          <TabsTrigger value="paste">{t("批量粘贴", "Paste entries")}</TabsTrigger>
+          <TabsTrigger value="paste">{t("批量播客名", "Paste names")}</TabsTrigger>
           <TabsTrigger value="file">{t("上传 Excel/CSV", "Upload Excel/CSV")}</TabsTrigger>
         </TabsList>
         <TabsContent value="paste" className="mt-3">
@@ -201,14 +200,14 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={t(
-              "每行一个：播客名称 / 小宇宙主页 / 喜马拉雅主页 / RSS 链接\n日谈公园\nhttps://www.xiaoyuzhoufm.com/podcast/5e7c3...\nhttps://www.ximalaya.com/album/12345678\nhttps://feeds.example.com/podcast.xml",
+              "每行一个播客名，系统会自动去小宇宙 / 喜马拉雅匹配\n日谈公园\n商业就是这样\n随机波动StochasticVolatility\n半拿铁 | 商业沉浮录",
               "One per line: podcast name or RSS URL\nThe Daily\nhttps://feeds.example.com/podcast.xml",
             )}
             className="min-h-[160px] font-mono text-xs"
           />
           <p className="mt-1.5 text-[11px] text-muted-foreground">
             {t(
-              "名称将依次尝试 小宇宙 → 喜马拉雅 → Apple Podcasts 自动匹配（重点抓取小宇宙 / 喜马拉雅订阅与评论数据）",
+              "名称将优先尝试 小宇宙 → 喜马拉雅，再用 Apple Podcasts / RSS 补充",
               "Names auto-matched via Apple Podcasts",
             )}
           </p>
@@ -248,7 +247,7 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
       <div className="flex items-center justify-between gap-3">
         <div className="text-xs text-muted-foreground">
           {t(
-            `共 ${extractEntries(text).length} 条`,
+            `共 ${extractEntries(text).length} 个播客名 / 链接`,
             `${extractEntries(text).length} entries ready`,
           )}
         </div>
@@ -265,7 +264,7 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
           ) : (
             <>
               <Upload className="h-4 w-4" />
-              {t("开始批量导入", "Start bulk import")}
+              {t("自动匹配并导入", "Start bulk import")}
             </>
           )}
         </Button>
@@ -289,9 +288,7 @@ export function BulkIngestForm({ market = "cn" }: { market?: "cn" | "na" }) {
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-mono">{r.input}</div>
                   {r.resolved && (
-                    <div className="truncate text-[10px] text-muted-foreground">
-                      → {r.resolved}
-                    </div>
+                    <div className="truncate text-[10px] text-muted-foreground">→ {r.resolved}</div>
                   )}
                   {r.message && <div className="text-destructive">{r.message}</div>}
                 </div>

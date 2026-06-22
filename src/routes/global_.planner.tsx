@@ -2,6 +2,7 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { SiteHeader } from "@/components/site-header";
+import { MetricTerm } from "@/components/metric-term";
 import { planCrossBorderCampaign } from "@/lib/insights.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,7 @@ import {
 export const Route = createFileRoute("/global_/planner")({
   head: () => ({
     meta: [
-      { title: "Cross-Border Planner — PodBridge" },
+      { title: "出海规划师 — PodBridge" },
       {
         name: "description",
         content:
@@ -145,7 +146,7 @@ function GlobalPlanner() {
           </div>
           <h1 className="text-3xl font-bold tracking-tight">出海播客投放规划师</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Powered by GPT-5 · 输入跨境品牌与预算（USD），自动从北美英文播客库存中匹配最优组合
+            Powered by AI · 输入跨境品牌与预算（USD），自动从北美英文播客库存中匹配最优组合
           </p>
         </div>
 
@@ -261,7 +262,7 @@ function GlobalPlanner() {
               Generate cross-border plan
             </Button>
             <p className="text-[10px] text-muted-foreground">
-              Model: OpenAI GPT-5 via Lovable AI Gateway
+              Model: DeepSeek Chat (OpenAI-compatible API)
             </p>
           </div>
 
@@ -276,7 +277,7 @@ function GlobalPlanner() {
               <div className="grid h-full place-items-center rounded-2xl border border-border bg-card p-16">
                 <div className="flex flex-col items-center gap-3 text-muted-foreground">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="text-sm">GPT-5 planning… usually 10–30 sec</p>
+                  <p className="text-sm">AI planning… usually 10-30 sec</p>
                 </div>
               </div>
             )}
@@ -329,23 +330,23 @@ function GlobalPlanner() {
                 >
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <TrendingUp className="h-4 w-4 text-primary" />
-                    KPI forecast
+                    指标预测
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                     {[
-                      { label: "Reach", value: fmtNum(result.kpi_forecast.total_reach) },
-                      { label: "Clicks", value: fmtNum(result.kpi_forecast.estimated_clicks) },
+                      { label: "触达", value: fmtNum(result.kpi_forecast.total_reach) },
+                      { label: "点击", value: fmtNum(result.kpi_forecast.estimated_clicks) },
                       {
-                        label: "Conversions",
+                        label: "转化",
                         value: fmtNum(result.kpi_forecast.estimated_conversions),
                       },
                       {
-                        label: "CPA",
+                        label: <MetricTerm term="CPA" />,
                         value: fmtMoney(result.kpi_forecast.estimated_cpa_usd),
                       },
                     ].map((k) => (
                       <div
-                        key={k.label}
+                        key={String(k.label)}
                         className="rounded-lg border border-border bg-muted/30 p-3"
                       >
                         <div className="text-xs text-muted-foreground">{k.label}</div>
@@ -361,7 +362,7 @@ function GlobalPlanner() {
                 >
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <Wallet className="h-4 w-4 text-primary" />
-                    Budget allocation
+                    预算分配
                   </div>
                   <div className="mt-4 space-y-3">
                     {result.budget_allocation.map((a, i) => (
@@ -394,7 +395,7 @@ function GlobalPlanner() {
                   >
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <CheckCircle2 className="h-4 w-4 text-primary" />
-                      Recommended shows ({result.selected_podcasts.length})
+                      推荐节目组合（{result.selected_podcasts.length} 档）
                     </div>
                     <div className="mt-4 grid gap-3 md:grid-cols-2">
                       {result.selected_podcasts.map((p, i) => (
@@ -411,15 +412,17 @@ function GlobalPlanner() {
                           <p className="mt-1 text-xs text-muted-foreground">{p.fit_reason}</p>
                           <div className="mt-2 grid grid-cols-3 gap-2 text-[10px]">
                             <div>
-                              <div className="text-muted-foreground">CPM</div>
+                              <div className="text-muted-foreground">
+                                <MetricTerm term="CPM" />
+                              </div>
                               <div className="font-medium">${p.estimated_cpm_usd}</div>
                             </div>
                             <div>
-                              <div className="text-muted-foreground">Eps</div>
+                              <div className="text-muted-foreground">集数</div>
                               <div className="font-medium">{p.estimated_episodes}</div>
                             </div>
                             <div>
-                              <div className="text-muted-foreground">Reach</div>
+                              <div className="text-muted-foreground">触达</div>
                               <div className="font-medium">{fmtNum(p.expected_reach)}</div>
                             </div>
                           </div>
@@ -433,7 +436,7 @@ function GlobalPlanner() {
                   <div className="rounded-2xl border border-amber-200 bg-amber-50/40 p-5">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <AlertTriangle className="h-4 w-4 text-amber-600" />
-                      Risk warnings
+                      风险提示
                     </div>
                     <ul className="mt-2 space-y-1 text-xs leading-relaxed text-muted-foreground">
                       {result.risk_warnings.map((r, i) => (
@@ -444,7 +447,7 @@ function GlobalPlanner() {
                   <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-5">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      Next steps
+                      下一步动作
                     </div>
                     <ul className="mt-2 space-y-1 text-xs leading-relaxed text-muted-foreground">
                       {result.next_steps.map((s, i) => (

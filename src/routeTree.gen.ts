@@ -9,18 +9,56 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SponsorsRouteImport } from './routes/sponsors'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ResearchRouteImport } from './routes/research'
 import { Route as PlannerRouteImport } from './routes/planner'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as GlobalRouteImport } from './routes/global'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ClaimsRouteImport } from './routes/claims'
+import { Route as CampaignsRouteImport } from './routes/campaigns'
+import { Route as BriefsRouteImport } from './routes/briefs'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PodcastIdRouteImport } from './routes/podcast.$id'
 import { Route as GlobalPlannerRouteImport } from './routes/global_.planner'
+import { Route as CreatorsJoinRouteImport } from './routes/creators.join'
+import { Route as CreatorClaimPodcastIdRouteImport } from './routes/creator-claim.$podcastId'
+import { Route as CampaignsCampaignIdRouteImport } from './routes/campaigns_.$campaignId'
+import { Route as ApiPublicOutreachOpportunitiesRouteImport } from './routes/api/public/outreach-opportunities'
+import { Route as ApiPublicDashboardPodcastsRouteImport } from './routes/api/public/dashboard-podcasts'
 import { Route as ApiPublicHooksStrategyRefreshRouteImport } from './routes/api/public/hooks/strategy-refresh'
 import { Route as ApiPublicHooksDailyRefreshRouteImport } from './routes/api/public/hooks/daily-refresh'
 
+const SponsorsRoute = SponsorsRouteImport.update({
+  id: '/sponsors',
+  path: '/sponsors',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResearchRoute = ResearchRouteImport.update({
+  id: '/research',
+  path: '/research',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlannerRoute = PlannerRouteImport.update({
   id: '/planner',
   path: '/planner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GlobalRoute = GlobalRouteImport.update({
@@ -31,6 +69,21 @@ const GlobalRoute = GlobalRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ClaimsRoute = ClaimsRouteImport.update({
+  id: '/claims',
+  path: '/claims',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampaignsRoute = CampaignsRouteImport.update({
+  id: '/campaigns',
+  path: '/campaigns',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BriefsRoute = BriefsRouteImport.update({
+  id: '/briefs',
+  path: '/briefs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -48,6 +101,33 @@ const GlobalPlannerRoute = GlobalPlannerRouteImport.update({
   path: '/global/planner',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CreatorsJoinRoute = CreatorsJoinRouteImport.update({
+  id: '/creators/join',
+  path: '/creators/join',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreatorClaimPodcastIdRoute = CreatorClaimPodcastIdRouteImport.update({
+  id: '/creator-claim/$podcastId',
+  path: '/creator-claim/$podcastId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampaignsCampaignIdRoute = CampaignsCampaignIdRouteImport.update({
+  id: '/campaigns_/$campaignId',
+  path: '/campaigns/$campaignId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicOutreachOpportunitiesRoute =
+  ApiPublicOutreachOpportunitiesRouteImport.update({
+    id: '/api/public/outreach-opportunities',
+    path: '/api/public/outreach-opportunities',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicDashboardPodcastsRoute =
+  ApiPublicDashboardPodcastsRouteImport.update({
+    id: '/api/public/dashboard-podcasts',
+    path: '/api/public/dashboard-podcasts',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksStrategyRefreshRoute =
   ApiPublicHooksStrategyRefreshRouteImport.update({
     id: '/api/public/hooks/strategy-refresh',
@@ -63,32 +143,71 @@ const ApiPublicHooksDailyRefreshRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/briefs': typeof BriefsRoute
+  '/campaigns': typeof CampaignsRoute
+  '/claims': typeof ClaimsRoute
   '/dashboard': typeof DashboardRoute
   '/global': typeof GlobalRoute
+  '/login': typeof LoginRoute
   '/planner': typeof PlannerRoute
+  '/research': typeof ResearchRoute
+  '/settings': typeof SettingsRoute
+  '/signup': typeof SignupRoute
+  '/sponsors': typeof SponsorsRoute
+  '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
+  '/creator-claim/$podcastId': typeof CreatorClaimPodcastIdRoute
+  '/creators/join': typeof CreatorsJoinRoute
   '/global/planner': typeof GlobalPlannerRoute
   '/podcast/$id': typeof PodcastIdRoute
+  '/api/public/dashboard-podcasts': typeof ApiPublicDashboardPodcastsRoute
+  '/api/public/outreach-opportunities': typeof ApiPublicOutreachOpportunitiesRoute
   '/api/public/hooks/daily-refresh': typeof ApiPublicHooksDailyRefreshRoute
   '/api/public/hooks/strategy-refresh': typeof ApiPublicHooksStrategyRefreshRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/briefs': typeof BriefsRoute
+  '/campaigns': typeof CampaignsRoute
+  '/claims': typeof ClaimsRoute
   '/dashboard': typeof DashboardRoute
   '/global': typeof GlobalRoute
+  '/login': typeof LoginRoute
   '/planner': typeof PlannerRoute
+  '/research': typeof ResearchRoute
+  '/settings': typeof SettingsRoute
+  '/signup': typeof SignupRoute
+  '/sponsors': typeof SponsorsRoute
+  '/campaigns/$campaignId': typeof CampaignsCampaignIdRoute
+  '/creator-claim/$podcastId': typeof CreatorClaimPodcastIdRoute
+  '/creators/join': typeof CreatorsJoinRoute
   '/global/planner': typeof GlobalPlannerRoute
   '/podcast/$id': typeof PodcastIdRoute
+  '/api/public/dashboard-podcasts': typeof ApiPublicDashboardPodcastsRoute
+  '/api/public/outreach-opportunities': typeof ApiPublicOutreachOpportunitiesRoute
   '/api/public/hooks/daily-refresh': typeof ApiPublicHooksDailyRefreshRoute
   '/api/public/hooks/strategy-refresh': typeof ApiPublicHooksStrategyRefreshRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/briefs': typeof BriefsRoute
+  '/campaigns': typeof CampaignsRoute
+  '/claims': typeof ClaimsRoute
   '/dashboard': typeof DashboardRoute
   '/global': typeof GlobalRoute
+  '/login': typeof LoginRoute
   '/planner': typeof PlannerRoute
+  '/research': typeof ResearchRoute
+  '/settings': typeof SettingsRoute
+  '/signup': typeof SignupRoute
+  '/sponsors': typeof SponsorsRoute
+  '/campaigns_/$campaignId': typeof CampaignsCampaignIdRoute
+  '/creator-claim/$podcastId': typeof CreatorClaimPodcastIdRoute
+  '/creators/join': typeof CreatorsJoinRoute
   '/global_/planner': typeof GlobalPlannerRoute
   '/podcast/$id': typeof PodcastIdRoute
+  '/api/public/dashboard-podcasts': typeof ApiPublicDashboardPodcastsRoute
+  '/api/public/outreach-opportunities': typeof ApiPublicOutreachOpportunitiesRoute
   '/api/public/hooks/daily-refresh': typeof ApiPublicHooksDailyRefreshRoute
   '/api/public/hooks/strategy-refresh': typeof ApiPublicHooksStrategyRefreshRoute
 }
@@ -96,53 +215,140 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/briefs'
+    | '/campaigns'
+    | '/claims'
     | '/dashboard'
     | '/global'
+    | '/login'
     | '/planner'
+    | '/research'
+    | '/settings'
+    | '/signup'
+    | '/sponsors'
+    | '/campaigns/$campaignId'
+    | '/creator-claim/$podcastId'
+    | '/creators/join'
     | '/global/planner'
     | '/podcast/$id'
+    | '/api/public/dashboard-podcasts'
+    | '/api/public/outreach-opportunities'
     | '/api/public/hooks/daily-refresh'
     | '/api/public/hooks/strategy-refresh'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/briefs'
+    | '/campaigns'
+    | '/claims'
     | '/dashboard'
     | '/global'
+    | '/login'
     | '/planner'
+    | '/research'
+    | '/settings'
+    | '/signup'
+    | '/sponsors'
+    | '/campaigns/$campaignId'
+    | '/creator-claim/$podcastId'
+    | '/creators/join'
     | '/global/planner'
     | '/podcast/$id'
+    | '/api/public/dashboard-podcasts'
+    | '/api/public/outreach-opportunities'
     | '/api/public/hooks/daily-refresh'
     | '/api/public/hooks/strategy-refresh'
   id:
     | '__root__'
     | '/'
+    | '/briefs'
+    | '/campaigns'
+    | '/claims'
     | '/dashboard'
     | '/global'
+    | '/login'
     | '/planner'
+    | '/research'
+    | '/settings'
+    | '/signup'
+    | '/sponsors'
+    | '/campaigns_/$campaignId'
+    | '/creator-claim/$podcastId'
+    | '/creators/join'
     | '/global_/planner'
     | '/podcast/$id'
+    | '/api/public/dashboard-podcasts'
+    | '/api/public/outreach-opportunities'
     | '/api/public/hooks/daily-refresh'
     | '/api/public/hooks/strategy-refresh'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BriefsRoute: typeof BriefsRoute
+  CampaignsRoute: typeof CampaignsRoute
+  ClaimsRoute: typeof ClaimsRoute
   DashboardRoute: typeof DashboardRoute
   GlobalRoute: typeof GlobalRoute
+  LoginRoute: typeof LoginRoute
   PlannerRoute: typeof PlannerRoute
+  ResearchRoute: typeof ResearchRoute
+  SettingsRoute: typeof SettingsRoute
+  SignupRoute: typeof SignupRoute
+  SponsorsRoute: typeof SponsorsRoute
+  CampaignsCampaignIdRoute: typeof CampaignsCampaignIdRoute
+  CreatorClaimPodcastIdRoute: typeof CreatorClaimPodcastIdRoute
+  CreatorsJoinRoute: typeof CreatorsJoinRoute
   GlobalPlannerRoute: typeof GlobalPlannerRoute
   PodcastIdRoute: typeof PodcastIdRoute
+  ApiPublicDashboardPodcastsRoute: typeof ApiPublicDashboardPodcastsRoute
+  ApiPublicOutreachOpportunitiesRoute: typeof ApiPublicOutreachOpportunitiesRoute
   ApiPublicHooksDailyRefreshRoute: typeof ApiPublicHooksDailyRefreshRoute
   ApiPublicHooksStrategyRefreshRoute: typeof ApiPublicHooksStrategyRefreshRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sponsors': {
+      id: '/sponsors'
+      path: '/sponsors'
+      fullPath: '/sponsors'
+      preLoaderRoute: typeof SponsorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/research': {
+      id: '/research'
+      path: '/research'
+      fullPath: '/research'
+      preLoaderRoute: typeof ResearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/planner': {
       id: '/planner'
       path: '/planner'
       fullPath: '/planner'
       preLoaderRoute: typeof PlannerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/global': {
@@ -157,6 +363,27 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/claims': {
+      id: '/claims'
+      path: '/claims'
+      fullPath: '/claims'
+      preLoaderRoute: typeof ClaimsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campaigns': {
+      id: '/campaigns'
+      path: '/campaigns'
+      fullPath: '/campaigns'
+      preLoaderRoute: typeof CampaignsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/briefs': {
+      id: '/briefs'
+      path: '/briefs'
+      fullPath: '/briefs'
+      preLoaderRoute: typeof BriefsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -180,6 +407,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GlobalPlannerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/creators/join': {
+      id: '/creators/join'
+      path: '/creators/join'
+      fullPath: '/creators/join'
+      preLoaderRoute: typeof CreatorsJoinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/creator-claim/$podcastId': {
+      id: '/creator-claim/$podcastId'
+      path: '/creator-claim/$podcastId'
+      fullPath: '/creator-claim/$podcastId'
+      preLoaderRoute: typeof CreatorClaimPodcastIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campaigns_/$campaignId': {
+      id: '/campaigns_/$campaignId'
+      path: '/campaigns/$campaignId'
+      fullPath: '/campaigns/$campaignId'
+      preLoaderRoute: typeof CampaignsCampaignIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/outreach-opportunities': {
+      id: '/api/public/outreach-opportunities'
+      path: '/api/public/outreach-opportunities'
+      fullPath: '/api/public/outreach-opportunities'
+      preLoaderRoute: typeof ApiPublicOutreachOpportunitiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/dashboard-podcasts': {
+      id: '/api/public/dashboard-podcasts'
+      path: '/api/public/dashboard-podcasts'
+      fullPath: '/api/public/dashboard-podcasts'
+      preLoaderRoute: typeof ApiPublicDashboardPodcastsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/strategy-refresh': {
       id: '/api/public/hooks/strategy-refresh'
       path: '/api/public/hooks/strategy-refresh'
@@ -199,14 +461,37 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BriefsRoute: BriefsRoute,
+  CampaignsRoute: CampaignsRoute,
+  ClaimsRoute: ClaimsRoute,
   DashboardRoute: DashboardRoute,
   GlobalRoute: GlobalRoute,
+  LoginRoute: LoginRoute,
   PlannerRoute: PlannerRoute,
+  ResearchRoute: ResearchRoute,
+  SettingsRoute: SettingsRoute,
+  SignupRoute: SignupRoute,
+  SponsorsRoute: SponsorsRoute,
+  CampaignsCampaignIdRoute: CampaignsCampaignIdRoute,
+  CreatorClaimPodcastIdRoute: CreatorClaimPodcastIdRoute,
+  CreatorsJoinRoute: CreatorsJoinRoute,
   GlobalPlannerRoute: GlobalPlannerRoute,
   PodcastIdRoute: PodcastIdRoute,
+  ApiPublicDashboardPodcastsRoute: ApiPublicDashboardPodcastsRoute,
+  ApiPublicOutreachOpportunitiesRoute: ApiPublicOutreachOpportunitiesRoute,
   ApiPublicHooksDailyRefreshRoute: ApiPublicHooksDailyRefreshRoute,
   ApiPublicHooksStrategyRefreshRoute: ApiPublicHooksStrategyRefreshRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
