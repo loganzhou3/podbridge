@@ -1,4 +1,5 @@
-import { useEffect, useState, useMemo } from "react";
+import { Component, useEffect, useState, useMemo } from "react";
+import type { ReactNode } from "react";
 import { ClientOnly, createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -198,8 +199,132 @@ function DashboardRoute() {
         </div>
       }
     >
-      <DashboardPage />
+      <DashboardErrorBoundary>
+        <DashboardPage />
+      </DashboardErrorBoundary>
     </ClientOnly>
+  );
+}
+
+class DashboardErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("[dashboard] full dashboard failed; falling back to basic library", error);
+  }
+
+  render() {
+    if (this.state.error) return <BasicDashboardFallback error={this.state.error} />;
+    return this.props.children;
+  }
+}
+
+function BasicDashboardFallback({ error }: { error: Error }) {
+  const [podcasts, setPodcasts] = useState<PodcastListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/public/dashboard-podcasts")
+      .then(async (res) => {
+        const payload = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(payload?.error ?? "播客库加载失败");
+        if (active) setPodcasts((payload?.podcasts ?? []) as PodcastListItem[]);
+      })
+      .catch((err) => {
+        if (active) setMessage(err instanceof Error ? err.message : "播客库加载失败");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const visible = podcasts.slice(0, 120);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <SiteHeader />
+      <main className="mx-auto max-w-7xl px-6 py-10">
+        <div className="mb-6 rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">
+          <div className="font-medium">播客库已进入基础模式</div>
+          <div className="mt-1 text-muted-foreground">
+            完整面板的一个辅助模块在生产环境加载失败，当前先展示主播客库。错误：
+            {error.message}
+          </div>
+        </div>
+        <div className="mb-8 flex items-end justify-between gap-6">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">播客库</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              基础模式直接读取主库存数据，保证播客列表可查看。
+            </p>
+          </div>
+          <Badge variant="secondary">{podcasts.length || "加载中"} 个播客</Badge>
+        </div>
+
+        {loading ? (
+          <div className="grid place-items-center py-20 text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        ) : message ? (
+          <div className="rounded-xl border border-dashed border-border p-16 text-center text-muted-foreground">
+            {message}
+          </div>
+        ) : (
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {visible.map((p) => (
+              <Link
+                key={p.id}
+                to="/podcast/$id"
+                params={{ id: p.id ?? "" }}
+                className="group min-w-0 rounded-2xl border border-border bg-card p-5 transition-all hover:-translate-y-0.5"
+                style={{ boxShadow: "var(--shadow-card)" }}
+              >
+                <div className="flex gap-4">
+                  {p.image_url ? (
+                    <img
+                      src={p.image_url}
+                      alt={p.title ?? ""}
+                      className="h-16 w-16 flex-shrink-0 rounded-lg object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="grid h-16 w-16 flex-shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                      <Activity className="h-6 w-6" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate font-semibold leading-tight">{p.title}</h3>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {p.author || "未知主播"}
+                    </p>
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      {p.category || "未分类"} · 订阅 {fmtCount(getSubscriberCount(p))}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4">
+                  <ScoreBar value={p.commercial_score ?? 0} label="商业" />
+                  <ScoreBar value={p.activity_score ?? 0} label="活跃" />
+                  <ScoreBar value={p.growth_score ?? 0} label="增长" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
   );
 }
 
