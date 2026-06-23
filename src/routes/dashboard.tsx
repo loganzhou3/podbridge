@@ -754,24 +754,10 @@ function DashboardPage() {
             <Button
               size="sm"
               variant="outline"
-              disabled={refreshing}
-              onClick={async () => {
-                setRefreshing(true);
-                toast.info("正在自动发现并刷新订阅/播放数据，最多 30 档…");
-                try {
-                  const r = await bulkRefresh({ data: { limit: 30 } });
-                  toast.success(
-                    `已刷新 ${r.success}/${r.total} 档，新发现 ${r.discovered} 个公开主页`,
-                  );
-                  refetch();
-                } catch (e) {
-                  toast.error(e instanceof Error ? e.message : "刷新失败");
-                } finally {
-                  setRefreshing(false);
-                }
-              }}
+              disabled={isRefreshingDaily}
+              onClick={refreshDailyData}
             >
-              {refreshing ? (
+              {isRefreshingDaily ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <RefreshCw className="h-3.5 w-3.5" />
