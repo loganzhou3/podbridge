@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { SiteHeader } from "@/components/site-header";
@@ -180,8 +180,28 @@ export const Route = createFileRoute("/dashboard")({
       { name: "description", content: "对比所有已分析的中文播客，按商业价值排序。" },
     ],
   }),
-  component: DashboardPage,
+  component: DashboardRoute,
 });
+
+function DashboardRoute() {
+  return (
+    <ClientOnly
+      fallback={
+        <div className="min-h-screen bg-background">
+          <SiteHeader />
+          <main className="mx-auto grid min-h-[60vh] max-w-7xl place-items-center px-6 py-10 text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              正在加载播客库…
+            </div>
+          </main>
+        </div>
+      }
+    >
+      <DashboardPage />
+    </ClientOnly>
+  );
+}
 
 function fmtDate(iso: string | null) {
   if (!iso) return "—";
@@ -543,12 +563,27 @@ function DashboardPage() {
 
   const { data: catData } = useQuery({
     queryKey: ["brand-categories"],
-    queryFn: () => listCats(),
+    queryFn: async () => {
+      try {
+        return await listCats();
+      } catch (error) {
+        console.warn("[dashboard] brand categories unavailable", error);
+        return { categories: [] };
+      }
+    },
+    enabled: isClient,
   });
 
   const { data: campaignData, refetch: refetchCampaigns } = useQuery({
     queryKey: ["dashboard-campaigns"],
-    queryFn: () => listCampaigns(),
+    queryFn: async () => {
+      try {
+        return await listCampaigns();
+      } catch (error) {
+        console.warn("[dashboard] campaigns unavailable", error);
+        return { briefs: [], campaigns: [] };
+      }
+    },
     enabled: isClient,
   });
 
