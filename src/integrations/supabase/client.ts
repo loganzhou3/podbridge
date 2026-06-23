@@ -2,6 +2,47 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
+function createDisabledSupabaseClient(message: string) {
+  const error = new Error(message);
+  const auth = {
+    getSession: async () => ({ data: { session: null }, error: null }),
+    getUser: async () => ({ data: { user: null }, error }),
+    onAuthStateChange: () => ({
+      data: {
+        subscription: {
+          unsubscribe: () => {},
+        },
+      },
+    }),
+    signOut: async () => ({ error: null }),
+    signInWithPassword: async () => ({ data: { user: null, session: null }, error }),
+    signUp: async () => ({ data: { user: null, session: null }, error }),
+  };
+
+  return {
+    auth,
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => ({ data: null, error }),
+          single: async () => ({ data: null, error }),
+        }),
+        order: () => ({
+          limit: async () => ({ data: [], error }),
+        }),
+      }),
+      insert: async () => ({ data: null, error }),
+      update: () => ({
+        eq: async () => ({ data: null, error }),
+      }),
+      upsert: async () => ({ data: null, error }),
+      delete: () => ({
+        eq: async () => ({ data: null, error }),
+      }),
+    }),
+  } as unknown as ReturnType<typeof createClient<Database>>;
+}
+
 function createSupabaseClient() {
   // Use import.meta.env for client-side (Vite build-time replacement)
   // Fall back to process.env for SSR (server-side rendering)
@@ -19,7 +60,7 @@ function createSupabaseClient() {
     ];
     const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Configure the PodBridge Supabase project.`;
     console.error(`[Supabase] ${message}`);
-    throw new Error(message);
+    return createDisabledSupabaseClient(message);
   }
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {

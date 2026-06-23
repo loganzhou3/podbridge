@@ -21,17 +21,19 @@ type DashboardPodcastRow = {
   xiaoyuzhou_url: string | null;
   ximalaya_url: string | null;
   itunes_url: string | null;
-  podcast_ad_profiles: {
-    host_read_min_rmb: number | null;
-    host_read_max_rmb: number | null;
-    sponsorship_min_rmb: number | null;
-    sponsorship_max_rmb: number | null;
-    custom_episode_min_rmb: number | null;
-    custom_episode_max_rmb: number | null;
-    data_confidence: string | null;
-    source_notes: string | null;
-    manually_confirmed_at: string | null;
-  } | null;
+};
+
+type PodcastAdProfileRow = {
+  podcast_id: string;
+  host_read_min_rmb: number | null;
+  host_read_max_rmb: number | null;
+  sponsorship_min_rmb: number | null;
+  sponsorship_max_rmb: number | null;
+  custom_episode_min_rmb: number | null;
+  custom_episode_max_rmb: number | null;
+  data_confidence: string | null;
+  source_notes: string | null;
+  manually_confirmed_at: string | null;
 };
 
 const DASHBOARD_SELECT = [
@@ -57,13 +59,27 @@ const DASHBOARD_SELECT = [
   "xiaoyuzhou_url",
   "ximalaya_url",
   "itunes_url",
-  "podcast_ad_profiles(host_read_min_rmb,host_read_max_rmb,sponsorship_min_rmb,sponsorship_max_rmb,custom_episode_min_rmb,custom_episode_max_rmb,data_confidence,source_notes,manually_confirmed_at)",
+].join(",");
+
+const AD_PROFILE_SELECT = [
+  "podcast_id",
+  "host_read_min_rmb",
+  "host_read_max_rmb",
+  "sponsorship_min_rmb",
+  "sponsorship_max_rmb",
+  "custom_episode_min_rmb",
+  "custom_episode_max_rmb",
+  "data_confidence",
+  "source_notes",
+  "manually_confirmed_at",
 ].join(",");
 
 function getSupabaseRestConfig() {
   const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
   const key =
     process.env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env.SUPABASE_ANON_KEY ??
+    process.env.VITE_SUPABASE_ANON_KEY ??
     process.env.SUPABASE_PUBLISHABLE_KEY ??
     process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) throw new Error("Supabase 环境变量未配置");
@@ -114,6 +130,33 @@ async function getBrandPodcastIds(brand: string) {
   return Array.from(new Set(rows.map((row) => row.podcast_id).filter(Boolean))) as string[];
 }
 
+function chunk<T>(items: T[], size: number) {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
+async function getPodcastAdProfiles(podcastIds: string[]) {
+  if (!podcastIds.length) return new Map<string, PodcastAdProfileRow>();
+  const profiles: PodcastAdProfileRow[] = [];
+  try {
+    for (const ids of chunk(podcastIds, 500)) {
+      const rows = await restGet<PodcastAdProfileRow[]>(
+        `podcast_ad_profiles?select=${AD_PROFILE_SELECT}&podcast_id=in.(${ids.join(",")})`,
+      );
+      profiles.push(...rows);
+    }
+  } catch (error) {
+    console.warn(
+      "[dashboard-podcasts] podcast_ad_profiles unavailable",
+      error instanceof Error ? error.message : error,
+    );
+  }
+  return new Map(profiles.map((profile) => [profile.podcast_id, profile]));
+}
+
 export async function buildDashboardPodcasts({
   brand,
   category,
@@ -145,11 +188,14 @@ export async function buildDashboardPodcasts({
     if (rows.length < pageSize) break;
   }
 
+  const adProfiles = await getPodcastAdProfiles(all.map((podcast) => podcast.id));
+
   return {
     podcasts: all.map((podcast) => {
       const subscriberCount = getSubscriberCount(podcast);
       return {
         ...podcast,
+        podcast_ad_profiles: adProfiles.get(podcast.id) ?? null,
         subscriber_count: subscriberCount,
         subscriber_source: getSubscriberSource(podcast),
         estimated_subscribers: subscriberCount,
